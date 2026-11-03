@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: estoque-master
+    runtime: docker
+    plan: free
+    region: oregon
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+
