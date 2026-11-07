@@ -17,6 +17,7 @@ public class DatabaseConnectionTests
         Assert.Equal("usr", cs.Username);
         Assert.Equal("p@ss:w", cs.Password);
         Assert.Equal(SslMode.Require, cs.SslMode);
+        Assert.True(cs.TrustServerCertificate); // cert interno do Render e autoassinado
     }
 
     [Fact]

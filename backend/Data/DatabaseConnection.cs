@@ -37,7 +37,8 @@ namespace backend.Data
             };
 
             // sslmode da URL; sem ele, exige TLS exceto em localhost (dev). O certificado interno do Render
-            // e autoassinado, entao "require" criptografa sem validar a cadeia (mesma semantica do libpq).
+            // e autoassinado, e o Npgsql (>= 6) valida a cadeia em SslMode.Require; por isso TrustServerCertificate=true
+            // reproduz o "require" do libpq (criptografa sem validar a cadeia). Nao protege contra MITM ativo na rede interna.
             var sslMode = System.Web.HttpUtility.ParseQueryString(uri.Query)["sslmode"];
             var isLocal = uri.Host is "localhost" or "127.0.0.1" or "::1";
             builder.SslMode = sslMode?.ToLowerInvariant() switch
@@ -47,6 +48,8 @@ namespace backend.Data
                 "require" or "verify-ca" or "verify-full" => SslMode.Require,
                 _ => isLocal ? SslMode.Disable : SslMode.Require
             };
+
+            if (builder.SslMode == SslMode.Require) builder.TrustServerCertificate = true;
 
             return builder.ConnectionString;
         }
