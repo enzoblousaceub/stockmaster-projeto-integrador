@@ -1,4 +1,6 @@
 using backend.Data;
+using backend.Security;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,15 +23,24 @@ builder.Services.AddProblemDetails(options =>
 var connectionString = DatabaseConnection.Resolve(builder.Configuration);
 builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
 
-// CORS
-builder.Services.AddCors(options =>
+// CORS: o front e servido pelo mesmo host, entao em producao nao ha CORS.
+// So habilita para as origens listadas em Cors:AllowedOrigins (ex.: http://localhost:4200 em dev).
+var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
+if (corsOrigins.Length > 0)
 {
-    options.AddPolicy("AllowAll", policy =>
-    {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
-    });
+    builder.Services.AddCors(options => options.AddPolicy("Configured", policy => policy
+        .WithOrigins(corsOrigins)
+        .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE")
+        .WithHeaders("Content-Type")));
+}
+
+// Atras do proxy do Render (TLS terminado na borda): confia no X-Forwarded-* de um unico salto
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.ForwardLimit = 1;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
 });
 
 // Configure Kestrel (respects PORT/ASPNETCORE_HTTP_PORTS environment variables or defaults to 8080)
@@ -47,8 +58,10 @@ var app = builder.Build();
 app.UseExceptionHandler();
 // Respostas 4xx/5xx vazias (ex.: 405, 415) tambem viram ProblemDetails
 app.UseStatusCodePages();
-app.UseHttpsRedirection();
-app.UseCors("AllowAll");
+app.UseForwardedHeaders();
+// HTTPS e redirecionamento ficam na borda do Render; aqui so HSTS (quando a requisicao chegou via HTTPS)
+app.UseSecurityHeaders(BuildCsp(app.Environment), hsts: !app.Environment.IsDevelopment());
+if (corsOrigins.Length > 0) app.UseCors("Configured");
 app.UseAuthorization();
 app.MapControllers();
 
@@ -97,6 +110,19 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.Run();
+
+// CSP com o hash dos scripts inline do index.html publicado (se mudar o script, o hash acompanha o build)
+static string BuildCsp(IWebHostEnvironment env)
+{
+    var candidates = new[]
+    {
+        Path.Combine(env.ContentRootPath, "wwwroot", "browser", "index.html"),
+        Path.Combine(env.ContentRootPath, "wwwroot", "index.html")
+    };
+    var index = candidates.FirstOrDefault(File.Exists);
+    var hashes = index is null ? Array.Empty<string>() : SecurityHeaders.InlineScriptHashes(File.ReadAllText(index));
+    return SecurityHeaders.BuildCsp(hashes);
+}
 
 // Necessario para os testes de integracao (WebApplicationFactory<Program>)
 public partial class Program { }
