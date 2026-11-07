@@ -26,18 +26,23 @@ namespace backend.Controllers
 
             if (!string.IsNullOrWhiteSpace(search))
             {
+                var pattern = $"%{EscapeLike(search.Trim())}%";
                 query = query.Where(p =>
-                    p.Name.ToLower().Contains(search.ToLower()) ||
-                    (p.Description != null && p.Description.ToLower().Contains(search.ToLower())));
+                    EF.Functions.ILike(p.Name, pattern, "\\") ||
+                    (p.Description != null && EF.Functions.ILike(p.Description, pattern, "\\")));
             }
 
             if (!string.IsNullOrWhiteSpace(category))
             {
-                query = query.Where(p => p.Category.ToLower() == category.ToLower());
+                query = query.Where(p => EF.Functions.ILike(p.Category, EscapeLike(category.Trim()), "\\"));
             }
 
             return await query.OrderByDescending(p => p.UpdatedAt).ToListAsync();
         }
+
+        // Escapa curingas do LIKE (% _ \) para que a busca seja literal
+        private static string EscapeLike(string value) =>
+            value.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
 
         // GET: api/products/stats
         [HttpGet("stats")]

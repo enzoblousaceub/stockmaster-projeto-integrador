@@ -63,7 +63,7 @@ public class ErrorHandlingTests : IClassFixture<ApiFactory>
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            await db.Database.ExecuteSqlRawAsync("DROP TABLE Products");
+            await db.Database.ExecuteSqlRawAsync("DROP TABLE \"Products\"");
         }
 
         var resp = await factory.CreateClient().GetAsync("/api/products");
@@ -72,7 +72,8 @@ public class ErrorHandlingTests : IClassFixture<ApiFactory>
         var body = await resp.Content.ReadAsStringAsync();
         Assert.Equal("application/problem+json", resp.Content.Headers.ContentType?.MediaType);
         Assert.DoesNotContain("Products", body);
-        Assert.DoesNotContain("SQLite", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Npgsql", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("relation", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("   at ", body);
         Assert.Contains("traceId", body);
     }

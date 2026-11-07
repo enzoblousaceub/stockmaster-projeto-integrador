@@ -49,6 +49,17 @@ public class ProductsApiTests : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task Search_TreatsLikeWildcardsLiterally()
+    {
+        var tag = Guid.NewGuid().ToString("N")[..8];
+        await CreateAsync($"A{tag}BC");
+        var r1 = await _client.GetFromJsonAsync<List<ProductResponse>>($"/api/products?search=A%25{tag}");
+        Assert.Empty(r1!);
+        var r2 = await _client.GetFromJsonAsync<List<ProductResponse>>($"/api/products?search=a{tag}b");
+        Assert.Single(r2!);
+    }
+
+    [Fact]
     public async Task CreateProduct_ReturnsCreatedWithLocation()
     {
         var resp = await _client.PostAsJsonAsync("/api/products", NewProduct("Novo"));

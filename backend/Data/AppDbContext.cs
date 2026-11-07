@@ -16,16 +16,11 @@ namespace backend.Data
             modelBuilder.Entity<Product>(entity =>
             {
                 entity.HasKey(e => e.Id);
-                entity.Property(e => e.Price)
-                    .HasConversion<double>();
-                
-                entity.Property(e => e.CreatedAt)
-                    .HasConversion(v => v.ToString("yyyy-MM-dd HH:mm:ss"), 
-                                   v => DateTime.SpecifyKind(DateTime.Parse(v, System.Globalization.CultureInfo.InvariantCulture), DateTimeKind.Utc));
-                
-                entity.Property(e => e.UpdatedAt)
-                    .HasConversion(v => v.ToString("yyyy-MM-dd HH:mm:ss"), 
-                                   v => DateTime.SpecifyKind(DateTime.Parse(v, System.Globalization.CultureInfo.InvariantCulture), DateTimeKind.Utc));
+                entity.Property(e => e.Price).HasColumnType("numeric(18,2)");
+                entity.Property(e => e.CreatedAt).HasColumnType("timestamp with time zone");
+                entity.Property(e => e.UpdatedAt).HasColumnType("timestamp with time zone");
+                entity.HasIndex(e => e.UpdatedAt);
+                entity.HasIndex(e => e.Category);
             });
         }
     }

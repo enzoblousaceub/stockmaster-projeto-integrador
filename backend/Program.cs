@@ -17,13 +17,9 @@ builder.Services.AddProblemDetails(options =>
     };
 });
 
-// SQLite configuration - AZURE COMPATIBLE
-var dbPath = Path.Combine(Directory.GetCurrentDirectory(), "Data", "stock.db");
-var dataDir = Path.GetDirectoryName(dbPath);
-if (!Directory.Exists(dataDir)) Directory.CreateDirectory(dataDir!);
-
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite($"Data Source={dbPath}"));
+// PostgreSQL (DATABASE_URL no Render; ConnectionStrings:Default em dev/testes)
+var connectionString = DatabaseConnection.Resolve(builder.Configuration);
+builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
 
 // CORS
 builder.Services.AddCors(options =>
@@ -88,12 +84,12 @@ else
     app.MapFallbackToFile("index.html");
 }
 
-// Ensure database is created and seeded
+// Aplica migrations (EF usa advisory lock, seguro com mais de uma instancia) e seed opcional
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.EnsureCreated();
-    DbInitializer.Initialize(db);
+    db.Database.Migrate();
+    if (app.Configuration.GetValue<bool>("Seed:Enabled")) DbInitializer.Initialize(db);
 }
 
 app.Run();

@@ -1,24 +1,49 @@
 using backend.Data;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
+using Testcontainers.PostgreSql;
 
 namespace backend.Tests;
 
 /// <summary>
-/// Fabrica de testes de integracao. O provedor do banco e escolhido em
-/// <see cref="ConfigureDatabase"/>: para migrar para PostgreSQL (ex.: Testcontainers),
-/// basta herdar desta classe e sobrescrever esse metodo; os testes nao mudam.
+/// Container PostgreSQL unico por execucao de testes (Testcontainers, exige Docker em execucao).
+/// Cada <see cref="ApiFactory"/> usa um banco proprio dentro dele, para isolar os testes.
+/// </summary>
+public static class SharedPostgres
+{
+    private static readonly Lazy<Task<string>> Server = new(async () =>
+    {
+        var container = new PostgreSqlBuilder().WithImage("postgres:17").Build();
+        await container.StartAsync();
+        return container.GetConnectionString();
+    });
+
+    public static async Task<string> NewDatabaseAsync()
+    {
+        var builder = new NpgsqlConnectionStringBuilder(await Server.Value)
+        {
+            Database = $"test_{Guid.NewGuid():N}"
+        };
+        return builder.ConnectionString;
+    }
+}
+
+/// <summary>
+/// Fabrica de testes de integracao contra PostgreSQL real. O provedor e escolhido em
+/// <see cref="ConfigureDatabase"/>; para outro banco basta herdar e sobrescrever.
 /// </summary>
 public class ApiFactory : WebApplicationFactory<Program>
 {
-    private SqliteConnection? _connection;
+    private readonly string _connectionString = SharedPostgres.NewDatabaseAsync().GetAwaiter().GetResult();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+        builder.UseSetting("ConnectionStrings:Default", _connectionString);
+        builder.UseSetting("Seed:Enabled", "true");
         builder.ConfigureServices(services =>
         {
             var descriptors = services
@@ -27,21 +52,11 @@ public class ApiFactory : WebApplicationFactory<Program>
                 .ToList();
             foreach (var d in descriptors) services.Remove(d);
 
-            ConfigureDatabase(services);
+            ConfigureDatabase(services, _connectionString);
         });
     }
 
-    /// <summary>Registra o AppDbContext usado nos testes (padrao: SQLite em memoria).</summary>
-    protected virtual void ConfigureDatabase(IServiceCollection services)
-    {
-        _connection = new SqliteConnection("DataSource=:memory:");
-        _connection.Open(); // conexao aberta mantem o banco em memoria vivo
-        services.AddDbContext<AppDbContext>(o => o.UseSqlite(_connection));
-    }
-
-    protected override void Dispose(bool disposing)
-    {
-        base.Dispose(disposing);
-        if (disposing) _connection?.Dispose();
-    }
+    /// <summary>Registra o AppDbContext usado nos testes (padrao: Npgsql no banco isolado).</summary>
+    protected virtual void ConfigureDatabase(IServiceCollection services, string connectionString) =>
+        services.AddDbContext<AppDbContext>(o => o.UseNpgsql(connectionString));
 }
