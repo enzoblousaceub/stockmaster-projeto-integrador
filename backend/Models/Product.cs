@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using backend.DTOs;
 
 namespace backend.Models
 {
@@ -17,13 +18,13 @@ namespace backend.Models
         [MaxLength(100)]
         public string Category { get; set; } = string.Empty;
 
-        [Range(0, int.MaxValue)]
+        [Range(0, Limits.MaxValue)]
         public int Quantity { get; set; }
 
-        [Range(0, double.MaxValue)]
+        [Range(typeof(decimal), "0", "1000000")]
         public decimal Price { get; set; }
 
-        [Range(0, int.MaxValue)]
+        [Range(0, Limits.MaxValue)]
         public int MinStock { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

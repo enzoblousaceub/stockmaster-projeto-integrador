@@ -1,6 +1,7 @@
 using backend.Data;
 using backend.DTOs;
 using backend.Models;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,7 +20,7 @@ namespace backend.Controllers
 
         // GET: api/products
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Product>>> GetProducts([FromQuery] string? search, [FromQuery] string? category)
+        public async Task<ActionResult<IEnumerable<Product>>> GetProducts([FromQuery, MaxLength(Limits.MaxQueryLength)] string? search, [FromQuery, MaxLength(Limits.MaxQueryLength)] string? category)
         {
             var query = _context.Products.AsQueryable();
 
