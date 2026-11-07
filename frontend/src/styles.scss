@@ -22,6 +22,7 @@
   --sm-surface-2: #f1f3f6;
   --sm-border: #e2e6ec;
   --sm-border-strong: #cbd2dc;
+  --sm-control-border: #8b97a8;
   --sm-text: #0f172a;
   --sm-text-2: #475569;
   --sm-primary: #2563eb;
@@ -29,9 +30,9 @@
   --sm-primary-soft: #e8efff;
   --sm-success: #15803d;
   --sm-success-soft: #e3f6ea;
-  --sm-warning: #b45309;
+  --sm-warning: #92400e;
   --sm-warning-soft: #fdf1dc;
-  --sm-danger: #dc2626;
+  --sm-danger: #b91c1c;
   --sm-danger-soft: #fde8e8;
   --sm-shadow: 0 1px 2px rgb(15 23 42 / 6%);
 }
@@ -42,6 +43,7 @@
   --sm-surface-2: #182236;
   --sm-border: #243049;
   --sm-border-strong: #33415f;
+  --sm-control-border: #7a89a6;
   --sm-text: #e6eaf2;
   --sm-text-2: #a3b0c8;
   --sm-primary: #6ea0ff;
@@ -95,7 +97,7 @@
   --mat-sys-surface-variant: var(--sm-surface-2);
   --mat-sys-on-surface: var(--sm-text);
   --mat-sys-on-surface-variant: var(--sm-text-2);
-  --mat-sys-outline: var(--sm-border-strong);
+  --mat-sys-outline: var(--sm-control-border);
   --mat-sys-outline-variant: var(--sm-border);
   --mat-sys-error: var(--sm-danger);
   --mat-sys-corner-extra-small: 6px;

@@ -10,6 +10,8 @@ export class ThemeService {
 
   constructor() {
     effect(() => this.apply(this.mode()));
+    // Modo automático acompanha mudanças do SO (atualiza theme-color)
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => this.apply(this.mode()));
   }
 
   cycle(): void {
