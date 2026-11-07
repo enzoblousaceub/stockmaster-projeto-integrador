@@ -3,19 +3,19 @@ import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } fro
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs';
 import { MatIconModule } from '@angular/material/icon';
-import { MatTooltipModule } from '@angular/material/tooltip';
-import { ThemeService } from './theme.service';
+import { MatDialog } from '@angular/material/dialog';
+import { SettingsDialogComponent } from './components/settings-dialog/settings-dialog';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, MatIconModule, MatTooltipModule],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, MatIconModule],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
 export class AppComponent {
   private router = inject(Router);
-  readonly theme = inject(ThemeService);
+  private dialog = inject(MatDialog);
   private main = viewChild<ElementRef<HTMLElement>>('main');
 
   private url = toSignal(
@@ -29,12 +29,15 @@ export class AppComponent {
     return path.startsWith('/products') && path !== '/products/new';
   });
 
-  readonly themeIcon = computed(() => ({ light: 'light_mode', dark: 'dark_mode', system: 'brightness_auto' }[this.theme.mode()]));
-  readonly themeLabel = computed(() => ({
-    light: 'Tema claro. Alternar para escuro',
-    dark: 'Tema escuro. Alternar para automático',
-    system: 'Tema automático. Alternar para claro'
-  }[this.theme.mode()]));
+  openSettings(): void {
+    this.dialog.open(SettingsDialogComponent, {
+      width: '440px',
+      maxWidth: 'calc(100vw - 32px)',
+      ariaLabelledBy: 'settings-title',
+      autoFocus: 'first-tabbable',
+      restoreFocus: true
+    });
+  }
 
   skipToContent(event: Event): void {
     event.preventDefault();

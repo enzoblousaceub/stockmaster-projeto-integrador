@@ -7,9 +7,9 @@
       <span class="brand-name">Estoque Master</span>
     </a>
     <span class="topbar-spacer"></span>
-    <button type="button" class="icon-btn theme-btn--top" (click)="theme.cycle()"
-      [attr.aria-label]="themeLabel()" [matTooltip]="themeLabel()">
-      <mat-icon aria-hidden="true">{{ themeIcon() }}</mat-icon>
+    <button type="button" class="icon-btn settings-btn--top" (click)="openSettings()"
+      aria-label="Configurações" aria-haspopup="dialog">
+      <mat-icon aria-hidden="true">settings</mat-icon>
     </button>
   </header>
 
@@ -41,10 +41,9 @@
         </a>
       </li>
     </ul>
-    <button type="button" class="nav-link theme-btn--nav" (click)="theme.cycle()"
-      [attr.aria-label]="themeLabel()">
-      <mat-icon aria-hidden="true">{{ themeIcon() }}</mat-icon>
-      <span class="nav-label">Tema</span>
+    <button type="button" class="nav-link settings-btn--nav" (click)="openSettings()" aria-haspopup="dialog">
+      <mat-icon aria-hidden="true">settings</mat-icon>
+      <span class="nav-label">Configurações</span>
     </button>
   </nav>
 

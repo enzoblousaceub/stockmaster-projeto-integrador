@@ -3,8 +3,7 @@
 /* ============================================================
    Design system — "Almoxarifado Claro"
    Tokens --sm-* são a fonte única; --mat-sys-* mapeiam o Material.
-   Tema: claro por padrão; escuro via [data-theme=dark] ou, no modo
-   automático, via prefers-color-scheme.
+   Tema: claro por padrão; escuro via [data-theme=dark].
    ============================================================ */
 
 :root {
@@ -121,16 +120,6 @@ html[data-theme='dark'] {
   @include sm-map-material;
 }
 
-/* Automático: sem data-theme explícito, segue o sistema */
-@media (prefers-color-scheme: dark) {
-  html:not([data-theme='light']):not([data-theme='dark']) {
-    color-scheme: dark;
-    @include sm-theme(dark);
-    @include sm-dark-tokens;
-    @include sm-map-material;
-  }
-}
-
 body {
   margin: 0;
   min-height: 100%;
@@ -221,5 +210,27 @@ mat-card {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+  }
+}
+
+/* Troca de tema animada */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.3s;
+  animation-timing-function: ease;
+}
+
+html.theme-fade,
+html.theme-fade *,
+html.theme-fade *::before,
+html.theme-fade *::after {
+  transition: background-color 0.28s ease, color 0.28s ease, border-color 0.28s ease, fill 0.28s ease !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
   }
 }

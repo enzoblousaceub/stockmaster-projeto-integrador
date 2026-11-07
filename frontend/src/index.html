@@ -15,7 +15,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
   <link rel="manifest" href="manifest.webmanifest">
-  <script>try{var t=localStorage.getItem("sm-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+  <script>try{var t=localStorage.getItem("sm-theme");if(t==="system"||t==="auto"){t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";localStorage.setItem("sm-theme",t)}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light")}catch(e){}</script>
   <meta name="theme-color" content="#f6f7f9"/>
 </head>
 

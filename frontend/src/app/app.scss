@@ -74,7 +74,7 @@
   &:hover { background: var(--sm-surface-2); color: var(--sm-text); }
 }
 
-.theme-btn--top { display: none; }
+.settings-btn--top { display: none; }
 
 .nav {
   grid-area: nav;
@@ -171,8 +171,8 @@
 
   .topbar { padding: 0 16px; }
   .brand { display: flex; }
-  .theme-btn--top { display: inline-flex; width: var(--sm-touch); height: var(--sm-touch); }
-  .theme-btn--nav, .nav-brand { display: none; }
+  .settings-btn--top { display: inline-flex; width: var(--sm-touch); height: var(--sm-touch); }
+  .settings-btn--nav, .nav-brand { display: none; }
 
   .main { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
 
