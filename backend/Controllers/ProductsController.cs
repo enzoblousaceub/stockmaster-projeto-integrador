@@ -45,7 +45,7 @@ namespace backend.Controllers
         {
             var products = await _context.Products.ToListAsync();
             var totalProducts = products.Count;
-            var totalItems = products.Sum(p => p.Quantity);
+            var totalItems = products.Sum(p => (long)p.Quantity);
             var totalValue = products.Sum(p => p.Quantity * p.Price);
             var lowStockCount = products.Count(p => p.Quantity > 0 && p.Quantity <= p.MinStock);
             var outOfStockCount = products.Count(p => p.Quantity == 0);

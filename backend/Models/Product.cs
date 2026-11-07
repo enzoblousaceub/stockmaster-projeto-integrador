@@ -21,7 +21,7 @@ namespace backend.Models
         [Range(0, Limits.MaxValue)]
         public int Quantity { get; set; }
 
-        [Range(typeof(decimal), "0", "1000000")]
+        [Range(typeof(decimal), "0", "1000000", ParseLimitsInInvariantCulture = true, ConvertValueInInvariantCulture = true)]
         public decimal Price { get; set; }
 
         [Range(0, Limits.MaxValue)]
