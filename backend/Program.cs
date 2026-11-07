@@ -1,6 +1,7 @@
 using backend.Data;
 using backend.Security;
 using Microsoft.AspNetCore.HttpOverrides;
+using System.Threading.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -43,6 +44,43 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.KnownProxies.Clear();
 });
 
+// Rate limit por IP, so na API (/api). Leitura e escrita tem limites separados (por minuto, configuraveis).
+var readLimit = builder.Configuration.GetValue("RateLimit:ReadPerMinute", 300);
+var writeLimit = builder.Configuration.GetValue("RateLimit:WritePerMinute", 120);
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+    {
+        if (!context.Request.Path.StartsWithSegments("/api"))
+            return RateLimitPartition.GetNoLimiter("static");
+
+        var isRead = HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method);
+        var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetSlidingWindowLimiter($"{(isRead ? "r" : "w")}:{ip}", _ => new SlidingWindowRateLimiterOptions
+        {
+            PermitLimit = isRead ? readLimit : writeLimit,
+            Window = TimeSpan.FromMinutes(1),
+            SegmentsPerWindow = 6,
+            QueueLimit = 0
+        });
+    });
+    options.OnRejected = async (ctx, ct) =>
+    {
+        // a janela deslizante nem sempre informa o tempo exato; usa o tamanho de um segmento (10s) como minimo
+        var seconds = ctx.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter)
+            ? Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds))
+            : 10;
+        ctx.HttpContext.Response.Headers.RetryAfter = seconds.ToString();
+        var problems = ctx.HttpContext.RequestServices.GetRequiredService<IProblemDetailsService>();
+        await problems.WriteAsync(new ProblemDetailsContext
+        {
+            HttpContext = ctx.HttpContext,
+            ProblemDetails = { Status = StatusCodes.Status429TooManyRequests, Title = "Too many requests", Detail = "Rate limit exceeded. Try again shortly." }
+        });
+    };
+});
+
 // Configure Kestrel (respects PORT/ASPNETCORE_HTTP_PORTS environment variables or defaults to 8080)
 var portEnv = Environment.GetEnvironmentVariable("PORT") ?? Environment.GetEnvironmentVariable("ASPNETCORE_HTTP_PORTS");
 var listenPort = (!string.IsNullOrEmpty(portEnv) && int.TryParse(portEnv, out var p)) ? p : 8080;
@@ -62,6 +100,7 @@ app.UseForwardedHeaders();
 // HTTPS e redirecionamento ficam na borda do Render; aqui so HSTS (quando a requisicao chegou via HTTPS)
 app.UseSecurityHeaders(BuildCsp(app.Environment), hsts: !app.Environment.IsDevelopment());
 if (corsOrigins.Length > 0) app.UseCors("Configured");
+app.UseRateLimiter();
 app.UseAuthorization();
 app.MapControllers();
 
