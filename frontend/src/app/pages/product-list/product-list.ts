@@ -1,4 +1,5 @@
-import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CurrencyPipe, DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -45,6 +46,7 @@ export class ProductListComponent implements OnInit, OnDestroy {
   private router = inject(Router);
   private dialog = inject(MatDialog);
   private snackBar = inject(MatSnackBar);
+  private destroyRef = inject(DestroyRef);
 
   readonly state = signal<'loading' | 'error' | 'ready'>('loading');
   readonly products = signal<Product[]>([]);
@@ -110,7 +112,7 @@ export class ProductListComponent implements OnInit, OnDestroy {
     const id = ++this.seq;
     this.state.set('loading');
     // O GET só parte depois que os PATCH em voo terminam (senão ele pode devolver a quantidade antiga)
-    if (this.inflightTotal() > 0) this.idle.pipe(take(1)).subscribe(() => this.fetch(id));
+    if (this.inflightTotal() > 0) this.idle.pipe(take(1), takeUntilDestroyed(this.destroyRef)).subscribe(() => this.fetch(id));
     else this.fetch(id);
   }
 

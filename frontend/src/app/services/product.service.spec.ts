@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProductService } from './product.service';
 import { Product } from '../models/product.model';
 
@@ -32,6 +32,17 @@ describe('ProductService.adjustQuantity', () => {
     expect(result?.quantity).toBe(5);
     http.verify();
   });
+
+  it('falha por timeout quando o PATCH não responde em 15 s', () => {
+    vi.useFakeTimers();
+    let error: unknown;
+    service.adjustQuantity(5, 1).subscribe({ error: (e) => (error = e) });
+    http.expectOne('/api/products/5/quantity'); // sem resposta
+    vi.advanceTimersByTime(15000);
+    expect((error as Error)?.name).toBe('TimeoutError');
+  });
+
+  afterEach(() => vi.useRealTimers());
 
   it('propaga o erro HTTP (ex.: 409) ao chamador', () => {
     let status = 0;

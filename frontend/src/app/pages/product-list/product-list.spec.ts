@@ -180,6 +180,37 @@ describe('ProductListComponent: ajuste rápido de quantidade (+/-)', () => {
     expect(qty()).toBe(5); // não vira 4
   });
 
+  it('dois load() seguidos com PATCH em voo geram um único GET', () => {
+    setup();
+    const patch = new Subject<Product>();
+    service.adjustQuantity.mockReturnValue(patch);
+    service.getProducts.mockClear();
+
+    cmp.adjust(cmp.products()[0], 1);
+    cmp.load();
+    cmp.load();
+    expect(service.getProducts).not.toHaveBeenCalled();
+
+    service.getProducts.mockReturnValue(of([mk(1, 6)]));
+    patch.next(mk(1, 6)); patch.complete();
+
+    expect(service.getProducts).toHaveBeenCalledTimes(1);
+  });
+
+  it('não dispara o GET se o componente for destruído enquanto espera o PATCH', () => {
+    setup();
+    const patch = new Subject<Product>();
+    service.adjustQuantity.mockReturnValue(patch);
+    service.getProducts.mockClear();
+
+    cmp.adjust(cmp.products()[0], 1);
+    cmp.load();
+    TestBed.resetTestingModule(); // destrói o componente
+    patch.next(mk(1, 6)); patch.complete();
+
+    expect(service.getProducts).not.toHaveBeenCalled();
+  });
+
   it('envia o PATCH mesmo se o item sair da lista durante o debounce (filtro)', () => {
     setup();
     service.adjustQuantity.mockReturnValue(of(mk(1, 6)));
