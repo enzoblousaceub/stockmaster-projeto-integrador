@@ -52,6 +52,10 @@ app.UseCors("AllowAll");
 app.UseAuthorization();
 app.MapControllers();
 
+// Healthcheck publico (Docker/Render): so informa ok/indisponivel, sem detalhes
+app.MapGet("/healthz", async (AppDbContext db, CancellationToken ct) =>
+    await db.Database.CanConnectAsync(ct) ? Results.Ok(new { status = "ok" }) : Results.StatusCode(503));
+
 // Serve Angular static files
 var browserPath = Path.Combine(builder.Environment.ContentRootPath, "wwwroot", "browser");
 var provider = new Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider();

@@ -78,3 +78,17 @@ public class ErrorHandlingTests : IClassFixture<ApiFactory>
         Assert.Contains("traceId", body);
     }
 }
+
+public class HealthTests : IClassFixture<ApiFactory>
+{
+    private readonly HttpClient _client;
+    public HealthTests(ApiFactory factory) => _client = factory.CreateClient();
+
+    [Fact]
+    public async Task Healthz_ReturnsOk_WithoutDetails()
+    {
+        var resp = await _client.GetAsync("/healthz");
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        Assert.Equal("{\"status\":\"ok\"}", await resp.Content.ReadAsStringAsync());
+    }
+}
