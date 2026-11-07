@@ -285,8 +285,8 @@ th[aria-sort='descending'] mat-icon { opacity: 1; }
       color: var(--sm-text);
       cursor: pointer;
 
-      &:hover:not(:disabled) { background: var(--sm-primary-soft); color: var(--sm-primary); }
-      &:disabled { opacity: 0.4; cursor: default; }
+      &:hover:not([aria-disabled='true']) { background: var(--sm-primary-soft); color: var(--sm-primary); }
+      &[aria-disabled='true'] { opacity: 0.4; cursor: default; }
     }
   }
 

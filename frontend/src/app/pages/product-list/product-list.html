@@ -117,7 +117,7 @@
                 <tr>
                   <td>
                     <div class="cell-product">
-                      <img [src]="'images/' + p.id + '.png'" (error)="onImgError($event)" alt="" width="40" height="40">
+                      <img [src]="'images/' + p.id + '.png'" (error)="onImgError($event)" alt="" width="40" height="40" loading="lazy">
                       <div class="cell-text">
                         <span class="p-name" [title]="p.name">{{ p.name }}</span>
                         <span class="p-code num">{{ code(p) }}</span>
@@ -148,7 +148,7 @@
           @for (p of pageItems(); track p.id) {
             <li class="card">
               <div class="card-top">
-                <img [src]="'images/' + p.id + '.png'" (error)="onImgError($event)" alt="" width="56" height="56">
+                <img [src]="'images/' + p.id + '.png'" (error)="onImgError($event)" alt="" width="56" height="56" loading="lazy">
                 <div class="card-id">
                   <span class="p-name">{{ p.name }}</span>
                   <span class="card-meta"><span class="cat">{{ p.category }}</span> · <span class="num">{{ code(p) }}</span></span>
@@ -161,12 +161,12 @@
               </div>
               <div class="card-bottom">
                 <div class="stepper" role="group" [attr.aria-label]="'Quantidade de ' + p.name">
-                  <button type="button" (click)="adjust(p, -1)" [disabled]="p.quantity <= 0 || pending().has(p.id)"
+                  <button type="button" (click)="adjust(p, -1)" [attr.aria-disabled]="p.quantity <= 0"
                     [attr.aria-label]="'Diminuir quantidade de ' + p.name">
                     <mat-icon aria-hidden="true">remove</mat-icon>
                   </button>
-                  <span class="qty num" aria-live="polite">{{ p.quantity | number }}</span>
-                  <button type="button" (click)="adjust(p, 1)" [disabled]="pending().has(p.id)"
+                  <span class="qty num">{{ p.quantity | number }}</span>
+                  <button type="button" (click)="adjust(p, 1)" [attr.aria-disabled]="p.quantity >= 1000000"
                     [attr.aria-label]="'Aumentar quantidade de ' + p.name">
                     <mat-icon aria-hidden="true">add</mat-icon>
                   </button>

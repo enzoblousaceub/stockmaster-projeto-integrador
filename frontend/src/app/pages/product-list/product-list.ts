@@ -53,8 +53,6 @@ export class ProductListComponent implements OnInit {
   readonly sortDir = signal<'asc' | 'desc'>('asc');
   readonly pageIndex = signal(0);
   readonly pageSize = signal(10);
-  /** ids com atualização de quantidade em andamento (desabilita +/-) */
-  readonly pending = signal<ReadonlySet<number>>(new Set());
   readonly announcement = signal('');
 
   readonly hasFilters = computed(() => !!this.query() || !!this.category());
@@ -180,24 +178,45 @@ export class ProductListComponent implements OnInit {
     if (!img.src.endsWith('images/placeholder.png')) img.src = 'images/placeholder.png';
   }
 
-  // ---------- ajuste rápido de quantidade (otimista, com rollback) ----------
+  // ---------- ajuste rápido de quantidade (otimista, cliques acumulados, rollback) ----------
+  private confirmed = new Map<number, number>(); // última quantidade confirmada pelo servidor
+  private timers = new Map<number, ReturnType<typeof setTimeout>>();
+  private inflight = new Set<number>();
+
   adjust(p: Product, delta: number): void {
-    const next = p.quantity + delta;
-    if (next < 0 || next > MAX_QTY || this.pending().has(p.id)) return;
-    const previous = p.quantity;
+    const cur = this.products().find((x) => x.id === p.id);
+    if (!cur) return;
+    const next = cur.quantity + delta;
+    if (next < 0 || next > MAX_QTY) return;
+    if (!this.confirmed.has(p.id)) this.confirmed.set(p.id, cur.quantity);
     this.patchQuantity(p.id, next);
-    this.setPending(p.id, true);
-    this.productService.updateProduct(p.id, {
+    clearTimeout(this.timers.get(p.id));
+    this.timers.set(p.id, setTimeout(() => this.flush(p.id), 400)); // um único PUT com o valor final
+  }
+
+  private flush(id: number): void {
+    this.timers.delete(id);
+    if (this.inflight.has(id)) { this.timers.set(id, setTimeout(() => this.flush(id), 200)); return; }
+    const p = this.products().find((x) => x.id === id);
+    if (!p) return;
+    const sent = p.quantity;
+    this.inflight.add(id);
+    this.productService.updateProduct(id, {
       name: p.name, description: p.description, category: p.category,
-      quantity: next, price: p.price, minStock: p.minStock
+      quantity: sent, price: p.price, minStock: p.minStock
     }).subscribe({
       next: () => {
-        this.setPending(p.id, false);
-        this.announcement.set(`${p.name}: ${next} em estoque`);
+        this.inflight.delete(id);
+        if (this.timers.has(id)) this.confirmed.set(id, sent); else this.confirmed.delete(id);
+        this.announcement.set(`${p.name}: ${sent} em estoque`);
       },
       error: () => {
-        this.patchQuantity(p.id, previous);
-        this.setPending(p.id, false);
+        this.inflight.delete(id);
+        clearTimeout(this.timers.get(id));
+        this.timers.delete(id);
+        const back = this.confirmed.get(id) ?? sent;
+        this.confirmed.delete(id);
+        this.patchQuantity(id, back);
         this.snackBar.open(`Não foi possível atualizar "${p.name}". Quantidade restaurada.`, 'Fechar', { duration: 4000 });
       }
     });
@@ -205,14 +224,6 @@ export class ProductListComponent implements OnInit {
 
   private patchQuantity(id: number, quantity: number): void {
     this.products.update((list) => list.map((x) => (x.id === id ? { ...x, quantity } : x)));
-  }
-
-  private setPending(id: number, on: boolean): void {
-    this.pending.update((s) => {
-      const n = new Set(s);
-      if (on) n.add(id); else n.delete(id);
-      return n;
-    });
   }
 
   // ---------- exclusão ----------
@@ -236,7 +247,10 @@ export class ProductListComponent implements OnInit {
           this.announcement.set(`${p.name} excluído`);
           document.getElementById('product-search')?.focus();
         },
-        error: () => this.snackBar.open('Não foi possível excluir o produto.', 'Fechar', { duration: 4000 })
+        error: () => {
+          this.snackBar.open('Não foi possível excluir o produto.', 'Fechar', { duration: 4000 });
+          trigger.focus();
+        }
       });
     });
   }

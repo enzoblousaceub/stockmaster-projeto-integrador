@@ -48,7 +48,7 @@ import { MatIconModule } from '@angular/material/icon';
     .btn mat-icon { width: 20px; height: 20px; font-size: 20px; }
     .btn-outline { border: 1px solid var(--sm-control-border); background: transparent; color: var(--sm-text); }
     .btn-outline:hover { background: var(--sm-surface-2); }
-    .btn-danger { border: 1px solid var(--sm-danger); background: var(--sm-danger); color: #fff; }
+    .btn-danger { border: 1px solid var(--sm-danger); background: var(--sm-danger); color: var(--sm-on-danger); }
     .btn-danger:hover { filter: brightness(1.1); }
     @media (max-width: 480px) {
       mat-dialog-actions { flex-direction: column-reverse; align-items: stretch; }
