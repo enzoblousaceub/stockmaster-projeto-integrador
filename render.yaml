@@ -1,10 +1,30 @@
+# Blueprint do Stock Master (Render).
+#
+# ATENCAO - banco GRATUITO (apenas para validar o projeto):
+#   * expira 30 dias apos a criacao (14 dias de carencia; depois o Render APAGA o banco e os dados);
+#   * nao tem backup; so 1 Postgres gratuito por workspace.
+#   Antes de usar dados reais, troque `plan: free` por um plano pago (tem backup/PITR).
+# Fonte: https://render.com/docs/free#free-postgres
+databases:
+  - name: stockmaster-db
+    plan: free
+    region: oregon
+    databaseName: stockmaster
+    user: stockmaster
+
 services:
   - type: web
     name: estoque-master
     runtime: docker
     plan: free
-    region: oregon
+    region: oregon          # mesma regiao do banco (URL interna)
+    healthCheckPath: /healthz
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
-
+      - key: Seed__Enabled   # dados de demonstracao desligados em producao
+        value: "false"
+      - key: DATABASE_URL    # URL interna do Render Postgres (postgresql://user:senha@host:5432/db)
+        fromDatabase:
+          name: stockmaster-db
+          property: connectionString
