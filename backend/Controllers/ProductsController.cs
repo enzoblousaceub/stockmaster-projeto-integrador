@@ -83,7 +83,7 @@ namespace backend.Controllers
 
             if (product == null)
             {
-                return NotFound(new { message = $"Product with ID {id} not found." });
+                return Problem(statusCode: StatusCodes.Status404NotFound, title: "Product not found", detail: $"Product with ID {id} not found.");
             }
 
             return product;
@@ -119,7 +119,7 @@ namespace backend.Controllers
 
             if (product == null)
             {
-                return NotFound(new { message = $"Product with ID {id} not found." });
+                return Problem(statusCode: StatusCodes.Status404NotFound, title: "Product not found", detail: $"Product with ID {id} not found.");
             }
 
             product.Name = dto.Name;
@@ -143,7 +143,7 @@ namespace backend.Controllers
 
             if (product == null)
             {
-                return NotFound(new { message = $"Product with ID {id} not found." });
+                return Problem(statusCode: StatusCodes.Status404NotFound, title: "Product not found", detail: $"Product with ID {id} not found.");
             }
 
             _context.Products.Remove(product);

@@ -7,6 +7,16 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
+// Erros padronizados em RFC 7807 (application/problem+json), sempre com traceId
+builder.Services.AddProblemDetails(options =>
+{
+    options.CustomizeProblemDetails = ctx =>
+    {
+        ctx.ProblemDetails.Extensions["traceId"] =
+            System.Diagnostics.Activity.Current?.Id ?? ctx.HttpContext.TraceIdentifier;
+    };
+});
+
 // SQLite configuration - AZURE COMPATIBLE
 var dbPath = Path.Combine(Directory.GetCurrentDirectory(), "Data", "stock.db");
 var dataDir = Path.GetDirectoryName(dbPath);
@@ -37,6 +47,10 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 var app = builder.Build();
 
 // Configure pipeline
+// Excecoes nao tratadas -> 500 ProblemDetails generico (sem stack/mensagem interna); detalhes vao so para o log
+app.UseExceptionHandler();
+// Respostas 4xx/5xx vazias (ex.: 405, 415) tambem viram ProblemDetails
+app.UseStatusCodePages();
 app.UseHttpsRedirection();
 app.UseCors("AllowAll");
 app.UseAuthorization();
