@@ -1,6 +1,6 @@
 import { Component, OnInit, ViewChild, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { ActivatedRoute, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatTableModule, MatTableDataSource } from '@angular/material/table';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
@@ -47,11 +47,16 @@ export class ProductListComponent implements OnInit {
     private productService: ProductService,
     private snackBar: MatSnackBar,
     private dialog: MatDialog,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private route: ActivatedRoute
   ) {}
 
   ngOnInit(): void {
-    this.loadProducts();
+    // A busca global (topbar) chega como ?q=
+    this.route.queryParamMap.subscribe((params) => {
+      this.searchQuery = params.get('q') ?? '';
+      this.loadProducts();
+    });
     this.loadCategories();
   }
 

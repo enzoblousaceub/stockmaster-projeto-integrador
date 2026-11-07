@@ -1,99 +1,143 @@
-<div class="dashboard-container">
-  <div class="page-header">
-    <h1>Painel de Controle</h1>
-    <p class="subtitle">Visão geral e indicadores em tempo real do seu estoque</p>
-  </div>
-
-  <div class="stats-grid" *ngIf="stats() && !loading()">
-    <mat-card class="stat-card total-products" id="stat-total-products">
-      <mat-card-content>
-        <div class="stat-icon">
-          <mat-icon>inventory_2</mat-icon>
-        </div>
-        <div class="stat-info">
-          <span class="stat-value">{{ stats()?.totalProducts }}</span>
-          <span class="stat-label">Total de Produtos</span>
-        </div>
-      </mat-card-content>
-    </mat-card>
-
-    <mat-card class="stat-card total-items" id="stat-total-items">
-      <mat-card-content>
-        <div class="stat-icon">
-          <mat-icon>widgets</mat-icon>
-        </div>
-        <div class="stat-info">
-          <span class="stat-value">{{ stats()?.totalItems | number }}</span>
-          <span class="stat-label">Total de Itens em Estoque</span>
-        </div>
-      </mat-card-content>
-    </mat-card>
-
-    <mat-card class="stat-card total-value" id="stat-total-value">
-      <mat-card-content>
-        <div class="stat-icon">
-          <mat-icon>attach_money</mat-icon>
-        </div>
-        <div class="stat-info">
-          <span class="stat-value">{{ stats()?.totalValue | currency:'BRL':'symbol':'1.2-2' }}</span>
-          <span class="stat-label">Valor Total do Estoque</span>
-        </div>
-      </mat-card-content>
-    </mat-card>
-
-    <mat-card class="stat-card categories" id="stat-categories">
-      <mat-card-content>
-        <div class="stat-icon">
-          <mat-icon>category</mat-icon>
-        </div>
-        <div class="stat-info">
-          <span class="stat-value">{{ stats()?.categories }}</span>
-          <span class="stat-label">Categorias</span>
-        </div>
-      </mat-card-content>
-    </mat-card>
-
-    <mat-card class="stat-card low-stock" id="stat-low-stock">
-      <mat-card-content>
-        <div class="stat-icon warning">
-          <mat-icon>warning</mat-icon>
-        </div>
-        <div class="stat-info">
-          <span class="stat-value">{{ stats()?.lowStockCount }}</span>
-          <span class="stat-label">Alerta: Estoque Baixo</span>
-        </div>
-      </mat-card-content>
-    </mat-card>
-
-    <mat-card class="stat-card out-of-stock" id="stat-out-of-stock">
-      <mat-card-content>
-        <div class="stat-icon danger">
-          <mat-icon>error</mat-icon>
-        </div>
-        <div class="stat-info">
-          <span class="stat-value">{{ stats()?.outOfStockCount }}</span>
-          <span class="stat-label">Alerta: Esgotados</span>
-        </div>
-      </mat-card-content>
-    </mat-card>
-  </div>
-
-  <div class="loading-container" *ngIf="loading()">
-    <mat-icon class="spin">sync</mat-icon>
-    <p>Carregando indicadores...</p>
-  </div>
-
-  <div class="quick-actions">
-    <h2>Ações Rápidas</h2>
-    <div class="actions-grid">
-      <a mat-raised-button color="primary" routerLink="/products/new" id="btn-add-product">
-        <mat-icon>add</mat-icon>
-        Cadastrar Novo Produto
-      </a>
-      <a mat-stroked-button routerLink="/products" id="btn-view-products">
-        <mat-icon>list</mat-icon>
-        Ver Todos os Produtos
-      </a>
+<div class="page">
+  <header class="page-header">
+    <div>
+      <h1>Dashboard</h1>
+      <p class="subtitle">Visão geral do estoque e itens que precisam de atenção</p>
     </div>
-  </div>
+    <a class="btn-primary" routerLink="/products/new" id="btn-add-product">
+      <mat-icon aria-hidden="true">add</mat-icon>
+      <span>Novo produto</span>
+    </a>
+  </header>
+
+  @switch (state()) {
+    @case ('loading') {
+      <div class="kpis" aria-busy="true" aria-live="polite">
+        <span class="sr-only">Carregando indicadores…</span>
+        @for (i of [1, 2, 3, 4]; track i) {
+          <div class="kpi skeleton" aria-hidden="true"><span class="sk sk-l"></span><span class="sk sk-v"></span></div>
+        }
+      </div>
+      <div class="panels" aria-hidden="true">
+        <div class="panel skeleton"><span class="sk sk-t"></span><span class="sk sk-row"></span><span class="sk sk-row"></span><span class="sk sk-row"></span></div>
+        <div class="panel skeleton"><span class="sk sk-t"></span><span class="sk sk-row"></span><span class="sk sk-row"></span><span class="sk sk-row"></span></div>
+      </div>
+    }
+
+    @case ('error') {
+      <div class="state-box" role="alert">
+        <mat-icon aria-hidden="true">cloud_off</mat-icon>
+        <h2>Não foi possível carregar o dashboard</h2>
+        <p>Verifique sua conexão e tente novamente.</p>
+        <button type="button" class="btn-primary" (click)="load()" id="btn-retry">
+          <mat-icon aria-hidden="true">refresh</mat-icon>
+          <span>Tentar novamente</span>
+        </button>
+      </div>
+    }
+
+    @case ('ready') {
+      @if (products().length === 0) {
+        <div class="state-box">
+          <mat-icon aria-hidden="true">inventory_2</mat-icon>
+          <h2>Seu estoque está vazio</h2>
+          <p>Cadastre o primeiro produto para ver indicadores e alertas aqui.</p>
+          <a class="btn-primary" routerLink="/products/new">
+            <mat-icon aria-hidden="true">add</mat-icon>
+            <span>Cadastrar primeiro produto</span>
+          </a>
+        </div>
+      } @else {
+        <section class="kpis" aria-label="Indicadores">
+          <div class="kpi" id="stat-total-products">
+            <span class="kpi-label"><mat-icon aria-hidden="true">inventory_2</mat-icon>Produtos</span>
+            <span class="kpi-value num">{{ stats()?.totalProducts | number }}</span>
+            <span class="kpi-sub">{{ stats()?.categories }} categorias</span>
+          </div>
+          <div class="kpi" id="stat-total-items">
+            <span class="kpi-label"><mat-icon aria-hidden="true">widgets</mat-icon>Itens em estoque</span>
+            <span class="kpi-value num">{{ stats()?.totalItems | number }}</span>
+            <span class="kpi-sub">unidades no total</span>
+          </div>
+          <div class="kpi" id="stat-total-value">
+            <span class="kpi-label"><mat-icon aria-hidden="true">payments</mat-icon>Valor em estoque</span>
+            <span class="kpi-value num">{{ stats()?.totalValue | currency: 'BRL' : 'symbol' : '1.2-2' }}</span>
+            <span class="kpi-sub">preço × quantidade</span>
+          </div>
+          <div class="kpi" [class.kpi--alert]="alertCount() > 0" [class.kpi--ok]="alertCount() === 0" id="stat-alerts">
+            <span class="kpi-label">
+              <mat-icon aria-hidden="true">{{ alertCount() > 0 ? 'warning' : 'check_circle' }}</mat-icon>Alertas
+            </span>
+            <span class="kpi-value num">{{ alertCount() }}</span>
+            <span class="kpi-sub">{{ stats()?.outOfStockCount }} esgotados · {{ stats()?.lowStockCount }} baixos</span>
+          </div>
+        </section>
+
+        <div class="panels">
+          <section class="panel" aria-labelledby="h-restock" id="restock-panel">
+            <div class="panel-head">
+              <h2 id="h-restock">Precisa de reposição</h2>
+              @if (alerts().length > 0) {
+                <a class="link" routerLink="/products">Ver produtos</a>
+              }
+            </div>
+
+            @if (alerts().length === 0) {
+              <div class="panel-empty">
+                <mat-icon aria-hidden="true">check_circle</mat-icon>
+                <p><strong>Tudo em dia.</strong> Nenhum item abaixo do estoque mínimo.</p>
+              </div>
+            } @else {
+              <ul class="restock-list">
+                @for (p of topAlerts(); track p.id) {
+                  <li class="restock-item">
+                    <div class="restock-main">
+                      <span class="restock-name">{{ p.name }}</span>
+                      <span class="restock-meta">
+                        {{ p.category }} ·
+                        <span class="num">{{ p.quantity }}</span> em estoque, mínimo
+                        <span class="num">{{ p.minStock }}</span>
+                      </span>
+                    </div>
+                    <span class="chip" [class.chip--danger]="isOut(p)" [class.chip--warning]="!isOut(p)">
+                      {{ isOut(p) ? 'Esgotado' : 'Baixo' }}
+                    </span>
+                    <a class="btn-outline" [routerLink]="['/products', p.id, 'edit']" [attr.aria-label]="'Repor ' + p.name">
+                      <mat-icon aria-hidden="true">add_shopping_cart</mat-icon>
+                      <span>Repor</span>
+                    </a>
+                  </li>
+                }
+              </ul>
+              @if (alerts().length > topAlerts().length) {
+                <p class="more">E mais {{ alerts().length - topAlerts().length }} {{ alerts().length - topAlerts().length === 1 ? 'item' : 'itens' }} abaixo do mínimo.</p>
+              }
+            }
+          </section>
+
+          <section class="panel" aria-labelledby="h-cat">
+            <div class="panel-head">
+              <h2 id="h-cat">Estoque por categoria</h2>
+              <span class="panel-note">unidades</span>
+            </div>
+            <ul class="bars">
+              @for (c of categories(); track c.name) {
+                <li class="bar-row">
+                  <div class="bar-label">
+                    <span class="bar-name">{{ c.name }}</span>
+                    <span class="bar-val num">{{ c.items | number }}</span>
+                  </div>
+                  <div class="bar-track" aria-hidden="true"><div class="bar-fill" [style.width.%]="c.percent"></div></div>
+                  <span class="bar-sub">
+                    {{ c.products }} {{ c.products === 1 ? 'produto' : 'produtos' }} ·
+                    {{ c.value | currency: 'BRL' : 'symbol' : '1.2-2' }}
+                  </span>
+                </li>
+              }
+            </ul>
+          </section>
+        </div>
+      }
+    }
+  }
 </div>

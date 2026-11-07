@@ -6,6 +6,12 @@
       <img src="brand/mark.svg" class="brand-logo" alt="" width="32" height="32">
       <span class="brand-name">Stock Master</span>
     </a>
+    <form class="global-search" role="search" (submit)="onSearch($event, q.value)">
+      <label for="global-search-input" class="sr-only">Buscar produtos</label>
+      <mat-icon aria-hidden="true">search</mat-icon>
+      <input #q id="global-search-input" type="search" name="q" placeholder="Buscar produtos…"
+        autocomplete="off" enterkeyhint="search" [value]="query()">
+    </form>
     <span class="topbar-spacer"></span>
     <button type="button" class="icon-btn settings-btn--top" (click)="openSettings()"
       aria-label="Configurações" aria-haspopup="dialog">

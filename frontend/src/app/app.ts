@@ -23,6 +23,17 @@ export class AppComponent {
     { initialValue: this.router.url }
   );
 
+  readonly query = toSignal(
+    this.router.events.pipe(filter((e) => e instanceof NavigationEnd), map(() => this.router.parseUrl(this.router.url).queryParams['q'] ?? '')),
+    { initialValue: this.router.parseUrl(this.router.url).queryParams['q'] ?? '' }
+  );
+
+  onSearch(event: Event, value: string): void {
+    event.preventDefault();
+    const q = value.trim();
+    this.router.navigate(['/products'], { queryParams: { q: q || null } });
+  }
+
   /** "Produtos" fica ativo na lista e na edição, mas não em /products/new (que tem item próprio). */
   readonly productsActive = computed(() => {
     const path = this.url().split(/[?#]/)[0];
