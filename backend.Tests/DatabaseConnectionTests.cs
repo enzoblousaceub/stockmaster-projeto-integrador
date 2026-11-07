@@ -37,6 +37,16 @@ public class DatabaseConnectionTests
     }
 
     [Theory]
+    [InlineData("verify-ca", SslMode.VerifyCA)]
+    [InlineData("verify-full", SslMode.VerifyFull)]
+    public void FromUrl_KeepsStrictSslModes(string mode, SslMode expected)
+    {
+        var cs = new NpgsqlConnectionStringBuilder(DatabaseConnection.FromUrl($"postgresql://u:p@host/db?sslmode={mode}"));
+        Assert.Equal(expected, cs.SslMode);
+        Assert.False(cs.TrustServerCertificate);
+    }
+
+    [Theory]
     [InlineData("not-a-url")]
     [InlineData("mysql://u:p@h/db")]
     public void FromUrl_RejectsInvalid_WithoutLeakingValue(string url)

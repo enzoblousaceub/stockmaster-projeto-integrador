@@ -45,7 +45,9 @@ namespace backend.Data
             {
                 "disable" => SslMode.Disable,
                 "prefer" => SslMode.Prefer,
-                "require" or "verify-ca" or "verify-full" => SslMode.Require,
+                "require" => SslMode.Require,
+                "verify-ca" => SslMode.VerifyCA,
+                "verify-full" => SslMode.VerifyFull,
                 _ => isLocal ? SslMode.Disable : SslMode.Require
             };
 

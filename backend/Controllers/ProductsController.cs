@@ -167,7 +167,13 @@ namespace backend.Controllers
                     detail: $"Quantity must stay between 0 and {Limits.MaxValue}.");
             }
 
-            var product = await _context.Products.AsNoTracking().FirstAsync(p => p.Id == id, ct);
+            var product = await _context.Products.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id, ct);
+            if (product == null)
+            {
+                // removido entre o UPDATE e a leitura
+                return Problem(statusCode: StatusCodes.Status404NotFound, title: "Product not found",
+                    detail: $"Product with ID {id} not found.");
+            }
             return Ok(product);
         }
 
