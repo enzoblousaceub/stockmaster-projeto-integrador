@@ -1,6 +1,6 @@
 /* Shell responsivo:
    >=1100px  sidenav completa (240px)
-   768-1099  rail compacta (80px, rótulo abaixo do ícone)
+   768-1099  rail compacta (96px, rótulo abaixo do ícone)
    <768      barra superior + barra de navegação inferior (alvos >= 48px) */
 
 .skip-link {
@@ -175,7 +175,7 @@
 
 /* Rail compacta */
 @media (max-width: 1099.98px) {
-  .shell { grid-template-columns: 80px minmax(0, 1fr); }
+  .shell { grid-template-columns: 96px minmax(0, 1fr); }
   .nav { padding: 12px 8px; }
   .nav-brand { justify-content: center; padding: 4px 0 16px; }
   .nav-brand .brand-name { display: none; }
