@@ -140,6 +140,37 @@ namespace backend.Controllers
             return Ok(product);
         }
 
+        // PATCH: api/products/5/quantity  {"delta": -1}
+        // Ajuste atomico no banco (Quantity = Quantity + delta), sem ler-modificar-gravar: seguro com cliques concorrentes.
+        [HttpPatch("{id}/quantity")]
+        public async Task<ActionResult<Product>> AdjustQuantity(int id, AdjustQuantityDto dto, CancellationToken ct)
+        {
+            var delta = dto.Delta;
+            var now = DateTime.UtcNow;
+
+            var affected = await _context.Products
+                .Where(p => p.Id == id && p.Quantity + delta >= 0 && p.Quantity + delta <= Limits.MaxValue)
+                .ExecuteUpdateAsync(set => set
+                    .SetProperty(p => p.Quantity, p => p.Quantity + delta)
+                    .SetProperty(p => p.UpdatedAt, now), ct);
+
+            if (affected == 0)
+            {
+                var exists = await _context.Products.AnyAsync(p => p.Id == id, ct);
+                if (!exists)
+                {
+                    return Problem(statusCode: StatusCodes.Status404NotFound, title: "Product not found",
+                        detail: $"Product with ID {id} not found.");
+                }
+
+                return Problem(statusCode: StatusCodes.Status409Conflict, title: "Invalid stock quantity",
+                    detail: $"Quantity must stay between 0 and {Limits.MaxValue}.");
+            }
+
+            var product = await _context.Products.AsNoTracking().FirstAsync(p => p.Id == id, ct);
+            return Ok(product);
+        }
+
         // DELETE: api/products/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteProduct(int id)
