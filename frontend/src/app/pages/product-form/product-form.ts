@@ -1,6 +1,6 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { AbstractControl, ReactiveFormsModule, FormBuilder, FormGroup, ValidationErrors, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -8,6 +8,13 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ProductService } from '../../services/product.service';
+
+/** Preço com no máximo 2 casas decimais. */
+function twoDecimals(c: AbstractControl): ValidationErrors | null {
+  const v = c.value;
+  if (v === null || v === '' || typeof v !== 'number') return null;
+  return Math.abs(v * 100 - Math.round(v * 100)) > 1e-6 ? { decimals: true } : null;
+}
 
 @Component({
   selector: 'app-product-form',
@@ -45,7 +52,7 @@ export class ProductFormComponent implements OnInit {
       description: ['', [Validators.maxLength(500)]],
       category: ['', [Validators.required, Validators.maxLength(100)]],
       quantity: [0, [Validators.required, Validators.min(0), Validators.max(1000000)]],
-      price: [0, [Validators.required, Validators.min(0), Validators.max(1000000)]],
+      price: [0, [Validators.required, Validators.min(0), Validators.max(1000000), twoDecimals]],
       minStock: [0, [Validators.required, Validators.min(0), Validators.max(1000000)]]
     });
 
@@ -58,6 +65,12 @@ export class ProductFormComponent implements OnInit {
       this.pageTitle = 'Editar produto';
       this.loadProduct(this.productId);
     }
+  }
+
+  /** Imagem ausente: troca pelo placeholder uma única vez (evita loop se ele faltar). */
+  onImgError(event: Event): void {
+    const img = event.target as HTMLImageElement;
+    if (!img.src.endsWith('images/placeholder.png')) img.src = 'images/placeholder.png';
   }
 
   loadProduct(id: number): void {

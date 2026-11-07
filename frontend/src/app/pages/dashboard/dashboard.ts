@@ -34,6 +34,9 @@ export class DashboardComponent {
       .filter((p) => p.quantity <= p.minStock)
       .sort((a, b) => this.severity(a) - this.severity(b) || a.name.localeCompare(b.name))
   );
+  readonly liveMessage = computed(() =>
+    this.state() === 'loading' ? 'Carregando indicadores…' : this.state() === 'ready' ? 'Indicadores carregados' : ''
+  );
   readonly topAlerts = computed(() => this.alerts().slice(0, 6));
   readonly alertCount = computed(() => {
     const s = this.stats();

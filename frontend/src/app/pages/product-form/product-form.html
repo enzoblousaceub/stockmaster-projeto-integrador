@@ -50,6 +50,7 @@
             @if (form.get('price')?.hasError('required')) { <mat-error>Informe o preço</mat-error> }
             @if (form.get('price')?.hasError('min')) { <mat-error>O preço não pode ser negativo</mat-error> }
             @if (form.get('price')?.hasError('max')) { <mat-error>Valor acima do permitido</mat-error> }
+            @if (form.get('price')?.hasError('decimals')) { <mat-error>Use no máximo 2 casas decimais</mat-error> }
           </mat-form-field>
 
           <mat-form-field appearance="fill" subscriptSizing="dynamic">
@@ -84,7 +85,7 @@
       <div class="preview-card" id="preview-card">
         <div class="image-wrapper">
           <img [src]="isEditMode && productId ? 'images/' + productId + '.png' : 'images/placeholder.png'"
-            onerror="this.src='images/placeholder.png'" class="preview-image" alt="" />
+            (error)="onImgError($event)" class="preview-image" alt="" />
         </div>
         <div class="preview-info">
           <span class="preview-name">{{ form.get('name')?.value || 'Nome do produto' }}</span>

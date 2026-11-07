@@ -293,6 +293,7 @@
 @media (max-width: 599.98px) {
   .page { padding: 16px; }
   .page-header { margin-bottom: 16px; }
+  .btn-primary, .btn-outline { min-height: var(--sm-touch); }
   .page-header .btn-primary { display: none; } /* o atalho de novo produto está na barra inferior */
   .kpis { gap: 8px; }
   .kpi { padding: 12px; }

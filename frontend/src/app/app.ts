@@ -24,9 +24,15 @@ export class AppComponent {
   );
 
   readonly query = toSignal(
-    this.router.events.pipe(filter((e) => e instanceof NavigationEnd), map(() => this.router.parseUrl(this.router.url).queryParams['q'] ?? '')),
-    { initialValue: this.router.parseUrl(this.router.url).queryParams['q'] ?? '' }
+    this.router.events.pipe(filter((e) => e instanceof NavigationEnd), map(() => this.currentQuery())),
+    { initialValue: this.currentQuery() }
   );
+
+  /** ?q= como texto único (se vier repetido, usa o primeiro). */
+  private currentQuery(): string {
+    const q = this.router.parseUrl(this.router.url).queryParams['q'];
+    return String(Array.isArray(q) ? q[0] : q ?? '');
+  }
 
   onSearch(event: Event, value: string): void {
     event.preventDefault();
