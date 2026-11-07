@@ -51,24 +51,24 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(96, 165, 250, 0.15);
+    background: var(--sm-primary-soft);
     flex-shrink: 0;
 
     mat-icon {
       font-size: 28px;
       width: 28px;
       height: 28px;
-      color: #60a5fa;
+      color: var(--sm-primary);
     }
 
     &.warning {
-      background: rgba(251, 191, 36, 0.15);
-      mat-icon { color: #fbbf24; }
+      background: var(--sm-warning-soft);
+      mat-icon { color: var(--sm-warning); }
     }
 
     &.danger {
-      background: rgba(248, 113, 113, 0.15);
-      mat-icon { color: #f87171; }
+      background: var(--sm-danger-soft);
+      mat-icon { color: var(--sm-danger); }
     }
   }
 
@@ -91,23 +91,15 @@
 }
 
 .stat-card.total-products .stat-icon {
-  background: rgba(59, 130, 246, 0.15);
-  mat-icon { color: #3b82f6; }
+  background: var(--sm-primary-soft);
+  mat-icon { color: var(--sm-primary); }
 }
 
-.stat-card.total-items .stat-icon {
-  background: rgba(148, 163, 184, 0.15);
-  mat-icon { color: #cbd5e1; }
-}
-
-.stat-card.total-value .stat-icon {
-  background: rgba(255, 255, 255, 0.12);
-  mat-icon { color: #ffffff; }
-}
-
+.stat-card.total-items .stat-icon,
+.stat-card.total-value .stat-icon,
 .stat-card.categories .stat-icon {
-  background: rgba(71, 85, 105, 0.2);
-  mat-icon { color: #94a3b8; }
+  background: var(--sm-surface-2);
+  mat-icon { color: var(--sm-text-2); }
 }
 
 .loading-container {
