@@ -83,3 +83,6 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.Run();
+
+// Necessario para os testes de integracao (WebApplicationFactory<Program>)
+public partial class Program { }

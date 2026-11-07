@@ -26,3 +26,6 @@ backend/Data/*.db
 # OS
 .DS_Store
 Thumbs.db
+backend.Tests/bin/
+backend.Tests/obj/
+TestResults/
