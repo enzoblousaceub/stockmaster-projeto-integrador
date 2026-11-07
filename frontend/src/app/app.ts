@@ -34,7 +34,7 @@ export class AppComponent {
       width: '440px',
       maxWidth: 'calc(100vw - 32px)',
       ariaLabelledBy: 'settings-title',
-      autoFocus: 'first-tabbable',
+      autoFocus: '[cdkFocusInitial]',
       restoreFocus: true
     });
   }

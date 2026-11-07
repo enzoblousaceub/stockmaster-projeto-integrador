@@ -24,7 +24,7 @@ import { ThemeMode, ThemeService } from '../../theme.service';
           @for (o of themes; track o.value) {
             <label class="seg" [class.on]="theme.mode() === o.value">
               <input type="radio" name="theme" [value]="o.value" [checked]="theme.mode() === o.value"
-                (change)="theme.set(o.value)">
+                (change)="theme.set(o.value)" [attr.cdkFocusInitial]="theme.mode() === o.value ? '' : null">
               <mat-icon aria-hidden="true">{{ o.icon }}</mat-icon>
               <span>{{ o.label }}</span>
             </label>
@@ -58,7 +58,8 @@ import { ThemeMode, ThemeService } from '../../theme.service';
     .seg input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
     .seg:hover { color: var(--sm-text); }
     .seg.on { background: var(--sm-surface); color: var(--sm-primary); font-weight: 600; box-shadow: 0 0 0 1px var(--sm-border-strong); }
-    .seg:has(input:focus-visible) { outline: 2px solid var(--sm-primary); outline-offset: 2px; }
+    .seg:focus-within { outline: 2px solid var(--sm-primary); outline-offset: 2px; }
+    .seg:has(input:not(:focus-visible)) { outline: none; }
   `]
 })
 export class SettingsDialogComponent {
