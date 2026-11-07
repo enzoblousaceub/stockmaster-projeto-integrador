@@ -2,6 +2,7 @@ import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular
 import { CurrencyPipe, DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { Subject, take } from 'rxjs';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDialog } from '@angular/material/dialog';
 import { MatPaginatorIntl, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
@@ -108,9 +109,17 @@ export class ProductListComponent implements OnInit, OnDestroy {
     this.flushAll(); // ajustes pendentes saem antes de a lista ser substituída
     const id = ++this.seq;
     this.state.set('loading');
+    // O GET só parte depois que os PATCH em voo terminam (senão ele pode devolver a quantidade antiga)
+    if (this.inflightTotal() > 0) this.idle.pipe(take(1)).subscribe(() => this.fetch(id));
+    else this.fetch(id);
+  }
+
+  private fetch(id: number): void {
+    if (id !== this.seq) return;
     this.productService.getProducts(this.query(), this.category()).subscribe({
       next: (list) => {
         if (id !== this.seq) return;
+        this.listGen++; // a lista local foi substituída pelo estado do servidor
         this.products.set(list);
         this.state.set('ready');
         this.announcement.set(`${list.length} ${list.length === 1 ? 'produto encontrado' : 'produtos encontrados'}`);
@@ -188,6 +197,8 @@ export class ProductListComponent implements OnInit, OnDestroy {
   private inflight = new Map<number, number>(); // requisições em andamento por produto
   private issued = new Map<number, number>();   // nº da última requisição emitida por produto
   private names = new Map<number, string>();    // nome para mensagens (independe da lista atual)
+  private idle = new Subject<void>();             // emite quando não há mais PATCH em voo
+  private listGen = 0;                             // incrementa a cada lista recebida do servidor
 
   adjust(p: Product, delta: number): void {
     const cur = this.products().find((x) => x.id === p.id);
@@ -222,27 +233,29 @@ export class ProductListComponent implements OnInit, OnDestroy {
     this.deltas.delete(id);
     if (delta === 0) return;
     const name = this.names.get(id) ?? 'produto';
+    const gen = this.listGen;
     const seq = (this.issued.get(id) ?? 0) + 1;
     this.issued.set(id, seq);
     this.inflight.set(id, (this.inflight.get(id) ?? 0) + 1);
     this.productService.adjustQuantity(id, delta).subscribe({
       next: (saved) => {
-        this.endInflight(id);
         // Só a resposta da requisição mais recente (e sem ajustes pendentes) define o valor:
         // respostas antigas que chegam fora de ordem são ignoradas.
         if (seq === this.issued.get(id) && !this.deltas.has(id)) this.patchQuantity(id, saved.quantity);
         this.announcement.set(`${name}: ${saved.quantity} em estoque`);
+        this.endInflight(id); // por último: libera o GET pendente só depois de aplicar o resultado
       },
       error: (err: HttpErrorResponse) => {
-        this.endInflight(id);
+        // Só reverte se a lista não foi substituída desde o clique (senão ela já traz o valor do servidor)
         const current = this.products().find((x) => x.id === id);
-        if (current) this.patchQuantity(id, current.quantity - delta);
+        if (current && gen === this.listGen) this.patchQuantity(id, current.quantity - delta);
         const retry = Number(err.headers?.get('Retry-After'));
         const msg =
           err.status === 409 ? `Estoque de "${name}" não pode ficar fora de 0 a 1.000.000. Quantidade restaurada.`
           : err.status === 429 ? `Muitas requisições${retry > 0 ? `. Tente de novo em ${retry} s` : '. Aguarde um instante'}. Quantidade restaurada.`
           : `Não foi possível atualizar "${name}". Quantidade restaurada.`;
         this.snackBar.open(msg, 'Fechar', { duration: 4000 });
+        this.endInflight(id);
       }
     });
   }
@@ -250,6 +263,13 @@ export class ProductListComponent implements OnInit, OnDestroy {
   private endInflight(id: number): void {
     const n = (this.inflight.get(id) ?? 1) - 1;
     if (n <= 0) this.inflight.delete(id); else this.inflight.set(id, n);
+    if (this.inflightTotal() === 0) this.idle.next();
+  }
+
+  private inflightTotal(): number {
+    let t = 0;
+    for (const n of this.inflight.values()) t += n;
+    return t;
   }
 
   private patchQuantity(id: number, quantity: number): void {
