@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { CurrencyPipe, DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -38,7 +38,7 @@ const MAX_QTY = 1_000_000;
   templateUrl: './product-list.html',
   styleUrl: './product-list.scss'
 })
-export class ProductListComponent implements OnInit {
+export class ProductListComponent implements OnInit, OnDestroy {
   private productService = inject(ProductService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -105,6 +105,7 @@ export class ProductListComponent implements OnInit {
   }
 
   load(): void {
+    this.flushAll(); // ajustes pendentes saem antes de a lista ser substituída
     const id = ++this.seq;
     this.state.set('loading');
     this.productService.getProducts(this.query(), this.category()).subscribe({
@@ -185,40 +186,62 @@ export class ProductListComponent implements OnInit {
   private deltas = new Map<number, number>();   // delta acumulado ainda não enviado
   private timers = new Map<number, ReturnType<typeof setTimeout>>();
   private inflight = new Map<number, number>(); // requisições em andamento por produto
+  private issued = new Map<number, number>();   // nº da última requisição emitida por produto
+  private names = new Map<number, string>();    // nome para mensagens (independe da lista atual)
 
   adjust(p: Product, delta: number): void {
     const cur = this.products().find((x) => x.id === p.id);
     if (!cur) return;
     const next = cur.quantity + delta;
-    if (next < 0 || next > MAX_QTY) return;
+    if (next < 0 || next > MAX_QTY) {
+      this.announcement.set(`${cur.name}: estoque ${next < 0 ? 'mínimo (0)' : 'máximo'} atingido`);
+      return;
+    }
+    this.names.set(p.id, cur.name);
     this.patchQuantity(p.id, next);
     this.deltas.set(p.id, (this.deltas.get(p.id) ?? 0) + delta);
     clearTimeout(this.timers.get(p.id));
     this.timers.set(p.id, setTimeout(() => this.flush(p.id), 400));
   }
 
+  /** Envia já todos os ajustes pendentes (antes de recarregar a lista ou sair da página). */
+  private flushAll(): void {
+    for (const [id, t] of [...this.timers]) {
+      clearTimeout(t);
+      this.flush(id);
+    }
+  }
+
+  ngOnDestroy(): void {
+    this.flushAll();
+  }
+
   private flush(id: number): void {
     this.timers.delete(id);
     const delta = this.deltas.get(id) ?? 0;
     this.deltas.delete(id);
-    const p = this.products().find((x) => x.id === id);
-    if (!p || delta === 0) return;
+    if (delta === 0) return;
+    const name = this.names.get(id) ?? 'produto';
+    const seq = (this.issued.get(id) ?? 0) + 1;
+    this.issued.set(id, seq);
     this.inflight.set(id, (this.inflight.get(id) ?? 0) + 1);
     this.productService.adjustQuantity(id, delta).subscribe({
       next: (saved) => {
         this.endInflight(id);
-        // Sem outros ajustes pendentes, adota o valor autoritativo do servidor
-        if (!this.inflight.has(id) && !this.deltas.has(id)) this.patchQuantity(id, saved.quantity);
-        this.announcement.set(`${p.name}: ${saved.quantity} em estoque`);
+        // Só a resposta da requisição mais recente (e sem ajustes pendentes) define o valor:
+        // respostas antigas que chegam fora de ordem são ignoradas.
+        if (seq === this.issued.get(id) && !this.deltas.has(id)) this.patchQuantity(id, saved.quantity);
+        this.announcement.set(`${name}: ${saved.quantity} em estoque`);
       },
       error: (err: HttpErrorResponse) => {
         this.endInflight(id);
         const current = this.products().find((x) => x.id === id);
         if (current) this.patchQuantity(id, current.quantity - delta);
+        const retry = Number(err.headers?.get('Retry-After'));
         const msg =
-          err.status === 409 ? `Estoque de "${p.name}" não pode ficar fora de 0 a 1.000.000. Quantidade restaurada.`
-          : err.status === 429 ? 'Muitas requisições. Aguarde um instante e tente de novo.'
-          : `Não foi possível atualizar "${p.name}". Quantidade restaurada.`;
+          err.status === 409 ? `Estoque de "${name}" não pode ficar fora de 0 a 1.000.000. Quantidade restaurada.`
+          : err.status === 429 ? `Muitas requisições${retry > 0 ? `. Tente de novo em ${retry} s` : '. Aguarde um instante'}. Quantidade restaurada.`
+          : `Não foi possível atualizar "${name}". Quantidade restaurada.`;
         this.snackBar.open(msg, 'Fechar', { duration: 4000 });
       }
     });
