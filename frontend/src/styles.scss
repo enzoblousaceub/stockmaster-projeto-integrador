@@ -1,83 +1,223 @@
 @use '@angular/material' as mat;
 
-html {
-  height: 100%;
+/* ============================================================
+   Design system — "Almoxarifado Claro"
+   Tokens --sm-* são a fonte única; --mat-sys-* mapeiam o Material.
+   Tema: claro por padrão; escuro via [data-theme=dark] ou, no modo
+   automático, via prefers-color-scheme.
+   ============================================================ */
+
+:root {
+  --sm-font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --sm-font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+
+  --sm-radius-sm: 6px;
+  --sm-radius: 8px;
+  --sm-radius-lg: 12px;
+  --sm-touch: 48px;
+
+  /* Claro */
+  --sm-bg: #f6f7f9;
+  --sm-surface: #ffffff;
+  --sm-surface-2: #f1f3f6;
+  --sm-border: #e2e6ec;
+  --sm-border-strong: #cbd2dc;
+  --sm-text: #0f172a;
+  --sm-text-2: #475569;
+  --sm-primary: #2563eb;
+  --sm-on-primary: #ffffff;
+  --sm-primary-soft: #e8efff;
+  --sm-success: #15803d;
+  --sm-success-soft: #e3f6ea;
+  --sm-warning: #b45309;
+  --sm-warning-soft: #fdf1dc;
+  --sm-danger: #dc2626;
+  --sm-danger-soft: #fde8e8;
+  --sm-shadow: 0 1px 2px rgb(15 23 42 / 6%);
+}
+
+@mixin sm-dark-tokens {
+  --sm-bg: #0b1220;
+  --sm-surface: #121a2b;
+  --sm-surface-2: #182236;
+  --sm-border: #243049;
+  --sm-border-strong: #33415f;
+  --sm-text: #e6eaf2;
+  --sm-text-2: #a3b0c8;
+  --sm-primary: #6ea0ff;
+  --sm-on-primary: #0b1220;
+  --sm-primary-soft: #172a52;
+  --sm-success: #4ade80;
+  --sm-success-soft: #12301f;
+  --sm-warning: #fbbf24;
+  --sm-warning-soft: #3a2a0c;
+  --sm-danger: #f87171;
+  --sm-danger-soft: #3b1618;
+  --sm-shadow: none;
+}
+
+@mixin sm-theme($type) {
   @include mat.theme(
     (
       color: (
         primary: mat.$azure-palette,
-        tertiary: mat.$violet-palette,
-        theme-type: dark,
+        tertiary: mat.$cyan-palette,
+        theme-type: $type,
       ),
-      typography: Roboto,
+      typography: (
+        plain-family: 'Inter',
+        brand-family: 'Inter',
+        bold-weight: 700,
+        medium-weight: 600,
+        regular-weight: 400,
+      ),
       density: 0,
     )
   );
 }
 
-body {
-  color-scheme: dark;
-  background: linear-gradient(135deg, #080c16 0%, #0f172a 50%, #1e293b 100%);
-  background-attachment: fixed;
-  color: var(--mat-sys-on-surface);
-  font-family: 'Plus Jakarta Sans', 'Roboto', sans-serif;
-  margin: 0;
+/* Mapeia os tokens do design system para o Material */
+@mixin sm-map-material {
+  --mat-sys-primary: var(--sm-primary);
+  --mat-sys-on-primary: var(--sm-on-primary);
+  --mat-sys-primary-container: var(--sm-primary-soft);
+  --mat-sys-on-primary-container: var(--sm-primary);
+  --mat-sys-secondary-container: var(--sm-primary-soft);
+  --mat-sys-on-secondary-container: var(--sm-primary);
+  --mat-sys-background: var(--sm-bg);
+  --mat-sys-on-background: var(--sm-text);
+  --mat-sys-surface: var(--sm-surface);
+  --mat-sys-surface-container-lowest: var(--sm-surface);
+  --mat-sys-surface-container-low: var(--sm-surface);
+  --mat-sys-surface-container: var(--sm-surface);
+  --mat-sys-surface-container-high: var(--sm-surface);
+  --mat-sys-surface-container-highest: var(--sm-surface-2);
+  --mat-sys-surface-variant: var(--sm-surface-2);
+  --mat-sys-on-surface: var(--sm-text);
+  --mat-sys-on-surface-variant: var(--sm-text-2);
+  --mat-sys-outline: var(--sm-border-strong);
+  --mat-sys-outline-variant: var(--sm-border);
+  --mat-sys-error: var(--sm-danger);
+  --mat-sys-corner-extra-small: 6px;
+  --mat-sys-corner-small: 8px;
+  --mat-sys-corner-medium: 8px;
+  --mat-sys-corner-large: 12px;
+  --mat-sys-corner-extra-large: 12px;
+}
+
+html {
   height: 100%;
+  color-scheme: light;
+  @include sm-theme(light);
+  @include sm-map-material;
+}
+
+html[data-theme='dark'] {
+  color-scheme: dark;
+  @include sm-theme(dark);
+  @include sm-dark-tokens;
+  @include sm-map-material;
+}
+
+/* Automático: sem data-theme explícito, segue o sistema */
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme='light']):not([data-theme='dark']) {
+    color-scheme: dark;
+    @include sm-theme(dark);
+    @include sm-dark-tokens;
+    @include sm-map-material;
+  }
+}
+
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--sm-bg);
+  color: var(--sm-text);
+  font-family: var(--sm-font);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Plus Jakarta Sans', 'Roboto', sans-serif !important;
+  font-family: var(--sm-font) !important;
+  letter-spacing: -0.01em;
+  color: var(--sm-text);
 }
 
-/* Scrollbar styling */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.01);
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.15);
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.25);
-}
-
-/* Card styling override */
-mat-card {
-  background: rgba(15, 23, 42, 0.5) !important;
-  border: 1px solid rgba(148, 163, 184, 0.1) !important;
-  backdrop-filter: blur(24px);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35) !important;
-}
-
-/* Snackbar styling */
-.mat-mdc-snack-bar-container {
-  border-radius: 12px !important;
-}
-
-/* Dialog styling */
-.mat-mdc-dialog-container .mdc-dialog__surface {
-  border-radius: 20px !important;
-  background: rgba(15, 23, 42, 0.9) !important;
-  border: 1px solid rgba(148, 163, 184, 0.15) !important;
-  backdrop-filter: blur(24px);
-}
-
-/* Global link reset */
 a {
   text-decoration: none;
   color: inherit;
 }
 
-/* Smooth transitions for interactive elements */
-a, button, mat-card, .stat-card, .table-row, .status-badge, .category-chip {
-  transition-property: background-color, border-color, box-shadow, transform, opacity;
-  transition-duration: 0.2s;
-  transition-timing-function: cubic-bezier(0.25, 0.8, 0.25, 1);
+/* Números e códigos em mono tabular */
+.num,
+.sku {
+  font-family: var(--sm-font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* Cabeçalho de página padrão (todas as telas) */
+.page-header h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: var(--sm-text);
+  background: none;
+  -webkit-text-fill-color: currentcolor;
+}
+
+.page-header .subtitle {
+  margin: 0;
+  color: var(--sm-text-2);
+  opacity: 1;
+  font-size: 0.9rem;
+}
+
+:focus-visible {
+  outline: 2px solid var(--sm-primary);
+  outline-offset: 2px;
+}
+
+/* Cartões: borda em vez de sombra */
+mat-card {
+  background: var(--sm-surface) !important;
+  border: 1px solid var(--sm-border) !important;
+  border-radius: var(--sm-radius-lg) !important;
+  box-shadow: var(--sm-shadow) !important;
+  backdrop-filter: none;
+}
+
+.mat-mdc-snack-bar-container {
+  border-radius: var(--sm-radius) !important;
+}
+
+.mat-mdc-dialog-container .mdc-dialog__surface {
+  border-radius: var(--sm-radius-lg) !important;
+  background: var(--sm-surface) !important;
+  border: 1px solid var(--sm-border) !important;
+  backdrop-filter: none;
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--sm-border-strong); border-radius: 4px; }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }
