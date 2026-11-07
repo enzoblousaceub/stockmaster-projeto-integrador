@@ -31,6 +31,11 @@ export class ProductService {
     return this.http.put<Product>(`${this.apiUrl}/${id}`, product);
   }
 
+  /** Ajuste atômico de quantidade no servidor (sem lost update). 409 = fora de 0..1.000.000. */
+  adjustQuantity(id: number, delta: number): Observable<Product> {
+    return this.http.patch<Product>(`${this.apiUrl}/${id}/quantity`, { delta });
+  }
+
   deleteProduct(id: number): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/${id}`);
   }

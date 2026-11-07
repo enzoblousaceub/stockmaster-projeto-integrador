@@ -1,5 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CurrencyPipe, DecimalPipe } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDialog } from '@angular/material/dialog';
@@ -178,48 +179,54 @@ export class ProductListComponent implements OnInit {
     if (!img.src.endsWith('images/placeholder.png')) img.src = 'images/placeholder.png';
   }
 
-  // ---------- ajuste rápido de quantidade (otimista, cliques acumulados, rollback) ----------
-  private confirmed = new Map<number, number>(); // última quantidade confirmada pelo servidor
+  // ---------- ajuste rápido de quantidade ----------
+  // Otimista: a UI muda na hora; os cliques são acumulados e enviados como UM delta
+  // (PATCH atômico no servidor). Em erro, só o delta enviado é revertido.
+  private deltas = new Map<number, number>();   // delta acumulado ainda não enviado
   private timers = new Map<number, ReturnType<typeof setTimeout>>();
-  private inflight = new Set<number>();
+  private inflight = new Map<number, number>(); // requisições em andamento por produto
 
   adjust(p: Product, delta: number): void {
     const cur = this.products().find((x) => x.id === p.id);
     if (!cur) return;
     const next = cur.quantity + delta;
     if (next < 0 || next > MAX_QTY) return;
-    if (!this.confirmed.has(p.id)) this.confirmed.set(p.id, cur.quantity);
     this.patchQuantity(p.id, next);
+    this.deltas.set(p.id, (this.deltas.get(p.id) ?? 0) + delta);
     clearTimeout(this.timers.get(p.id));
-    this.timers.set(p.id, setTimeout(() => this.flush(p.id), 400)); // um único PUT com o valor final
+    this.timers.set(p.id, setTimeout(() => this.flush(p.id), 400));
   }
 
   private flush(id: number): void {
     this.timers.delete(id);
-    if (this.inflight.has(id)) { this.timers.set(id, setTimeout(() => this.flush(id), 200)); return; }
+    const delta = this.deltas.get(id) ?? 0;
+    this.deltas.delete(id);
     const p = this.products().find((x) => x.id === id);
-    if (!p) return;
-    const sent = p.quantity;
-    this.inflight.add(id);
-    this.productService.updateProduct(id, {
-      name: p.name, description: p.description, category: p.category,
-      quantity: sent, price: p.price, minStock: p.minStock
-    }).subscribe({
-      next: () => {
-        this.inflight.delete(id);
-        if (this.timers.has(id)) this.confirmed.set(id, sent); else this.confirmed.delete(id);
-        this.announcement.set(`${p.name}: ${sent} em estoque`);
+    if (!p || delta === 0) return;
+    this.inflight.set(id, (this.inflight.get(id) ?? 0) + 1);
+    this.productService.adjustQuantity(id, delta).subscribe({
+      next: (saved) => {
+        this.endInflight(id);
+        // Sem outros ajustes pendentes, adota o valor autoritativo do servidor
+        if (!this.inflight.has(id) && !this.deltas.has(id)) this.patchQuantity(id, saved.quantity);
+        this.announcement.set(`${p.name}: ${saved.quantity} em estoque`);
       },
-      error: () => {
-        this.inflight.delete(id);
-        clearTimeout(this.timers.get(id));
-        this.timers.delete(id);
-        const back = this.confirmed.get(id) ?? sent;
-        this.confirmed.delete(id);
-        this.patchQuantity(id, back);
-        this.snackBar.open(`Não foi possível atualizar "${p.name}". Quantidade restaurada.`, 'Fechar', { duration: 4000 });
+      error: (err: HttpErrorResponse) => {
+        this.endInflight(id);
+        const current = this.products().find((x) => x.id === id);
+        if (current) this.patchQuantity(id, current.quantity - delta);
+        const msg =
+          err.status === 409 ? `Estoque de "${p.name}" não pode ficar fora de 0 a 1.000.000. Quantidade restaurada.`
+          : err.status === 429 ? 'Muitas requisições. Aguarde um instante e tente de novo.'
+          : `Não foi possível atualizar "${p.name}". Quantidade restaurada.`;
+        this.snackBar.open(msg, 'Fechar', { duration: 4000 });
       }
     });
+  }
+
+  private endInflight(id: number): void {
+    const n = (this.inflight.get(id) ?? 1) - 1;
+    if (n <= 0) this.inflight.delete(id); else this.inflight.set(id, n);
   }
 
   private patchQuantity(id: number, quantity: number): void {
