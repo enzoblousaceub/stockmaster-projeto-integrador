@@ -5,6 +5,7 @@ using backend.Data;
 using backend.Models;
 using backend.Security;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -838,5 +839,62 @@ public class AdminBootstrapTests
         var resp = await admin.PostAsJsonAsync("/api/users", new { usuario = "novo.user", perfil = "Visualizador" });
         Assert.Equal(HttpStatusCode.ServiceUnavailable, resp.StatusCode);
         Assert.Equal("service_misconfigured", (await resp.ReadProblemAsync()).Code);
+    }
+}
+
+public class TestUserSeedTests
+{
+    private const string TestUser = "teste";
+    private const string TestPassword = "Teste-Seed-123";
+
+    private static WebApplicationFactory<Program> WithTestUser(ApiFactory factory, string? perfil = null, string seedEnabled = "true") =>
+        factory.WithWebHostBuilder(b =>
+        {
+            b.UseSetting("Seed:Enabled", seedEnabled);
+            b.UseSetting("Seed:TestUsuario", TestUser);
+            b.UseSetting("Seed:TestSenha", TestPassword);
+            if (perfil is not null) b.UseSetting("Seed:TestPerfil", perfil);
+        });
+
+    [Fact]
+    public async Task WithVars_CreatesViewerByDefault_AndCanLogin()
+    {
+        using var baseFactory = new ApiFactory();
+        using var factory = WithTestUser(baseFactory);
+        var client = factory.CreateClient(new() { HandleCookies = true });
+        Assert.Equal(HttpStatusCode.OK, (await client.LoginAsync(TestUser, TestPassword)).StatusCode);
+        using var scope = factory.Services.CreateScope();
+        var user = await scope.ServiceProvider.GetRequiredService<AppDbContext>().Users.SingleAsync(u => u.Usuario == TestUser);
+        Assert.Equal(Roles.Viewer, user.Role);
+    }
+
+    [Fact]
+    public async Task WithAdminProfile_CreatesAdmin()
+    {
+        using var baseFactory = new ApiFactory();
+        using var factory = WithTestUser(baseFactory, Roles.Admin);
+        _ = factory.CreateClient();
+        using var scope = factory.Services.CreateScope();
+        var user = await scope.ServiceProvider.GetRequiredService<AppDbContext>().Users.SingleAsync(u => u.Usuario == TestUser);
+        Assert.Equal(Roles.Admin, user.Role);
+    }
+
+    [Fact]
+    public async Task SeedDisabled_DoesNotCreateTestUser()
+    {
+        using var baseFactory = new ApiFactory();
+        using var factory = WithTestUser(baseFactory, seedEnabled: "false");
+        _ = factory.CreateClient();
+        using var scope = factory.Services.CreateScope();
+        Assert.False(await scope.ServiceProvider.GetRequiredService<AppDbContext>().Users.AnyAsync(u => u.Usuario == TestUser));
+    }
+
+    [Fact]
+    public async Task WithoutVars_NoTestUserIsCreated()
+    {
+        using var factory = new ApiFactory();
+        _ = factory.CreateClient();
+        using var scope = factory.Services.CreateScope();
+        Assert.Equal(1, await scope.ServiceProvider.GetRequiredService<AppDbContext>().Users.CountAsync());
     }
 }
