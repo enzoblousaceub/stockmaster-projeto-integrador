@@ -78,6 +78,19 @@ describe('guardas de rota', () => {
     expect(res).toBe(true);
   });
 
+  it('servidor indisponível no boot (500 no /me): as guardas NÃO mandam ao login', async () => {
+    const p = run(authGuard);
+    await Promise.resolve();
+    ctrl.expectOne('/api/auth/me').flush({}, { status: 500, statusText: 'Server Error' });
+    expect(await p).toBe(false);
+  });
+
+  it('adminGuard sem sessão não avisa "sem permissão" (o login cuida)', async () => {
+    const res = await respondMe(run(adminGuard), 401, {});
+    expect(router.serializeUrl(res as UrlTree)).toBe('/');
+    expect(snack.open).not.toHaveBeenCalled();
+  });
+
   it('o /me do boot é chamado uma única vez para várias guardas', async () => {
     const a = run(authGuard);
     const b = run(adminGuard);

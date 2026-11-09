@@ -25,6 +25,8 @@ export class ActivateComponent implements OnDestroy {
   readonly passwordError = signal('');
   readonly wait = signal(0);
   readonly waitText = computed(() => formatWait(this.wait()));
+  /** texto lido por leitores de tela: só no início e no fim da espera */
+  readonly waitNote = signal('');
 
   private timer?: ReturnType<typeof setInterval>;
 
@@ -70,9 +72,10 @@ export class ActivateComponent implements OnDestroy {
   private startCountdown(seconds: number): void {
     clearInterval(this.timer);
     this.wait.set(seconds);
+    this.waitNote.set(`Tente novamente em ${formatWait(seconds)}.`);
     this.timer = setInterval(() => {
       this.wait.update((n) => n - 1);
-      if (this.wait() <= 0) { clearInterval(this.timer); this.error.set(''); }
+      if (this.wait() <= 0) { clearInterval(this.timer); this.error.set(''); this.waitNote.set('Você já pode tentar novamente.'); }
     }, 1000);
   }
 

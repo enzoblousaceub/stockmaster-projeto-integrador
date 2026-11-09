@@ -303,3 +303,26 @@
 @media (max-width: 767.98px) {
   .user-chip, .logout-btn--top { display: none; }
 }
+
+.boot--error {
+  flex-direction: column;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+
+  img { animation: none; }
+  h1 { margin: 8px 0 0; font-size: 1.25rem; }
+  p { margin: 0 0 12px; color: var(--sm-text-2); max-width: 36ch; }
+}
+
+.boot-btn {
+  min-height: 48px;
+  padding: 0 20px;
+  border: 1px solid var(--sm-primary);
+  border-radius: var(--sm-radius);
+  background: var(--sm-primary);
+  color: var(--sm-on-primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}

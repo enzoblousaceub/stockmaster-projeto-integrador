@@ -4,6 +4,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDialog } from '@angular/material/dialog';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { SettingsDialogComponent } from './components/settings-dialog/settings-dialog';
 import { AuthService } from './core/auth.service';
 
@@ -18,6 +19,7 @@ export class AppComponent {
   private router = inject(Router);
   private dialog = inject(MatDialog);
   readonly auth = inject(AuthService);
+  private snack = inject(MatSnackBar);
 
   constructor() {
     this.auth.ensureLoaded(); // descobre a sessão no boot (GET /api/auth/me)
@@ -25,10 +27,12 @@ export class AppComponent {
 
   readonly initials = computed(() => (this.auth.user()?.usuario ?? '').slice(0, 2).toUpperCase());
 
-  /** Encerra a sessão em TODOS os dispositivos; mesmo se falhar, limpa o estado local. */
+  /** Encerra a sessão em TODOS os dispositivos. Se falhar, a tela NÃO finge que saiu. */
   logout(): void {
-    const done = () => { this.auth.clear(); this.router.navigate(['/login']); };
-    this.auth.logout().subscribe({ next: done, error: done });
+    this.auth.logout().subscribe({
+      next: () => this.router.navigate(['/login']),
+      error: () => this.snack.open('Não foi possível encerrar a sessão. Tente novamente.', 'Fechar', { duration: 5000 })
+    });
   }
   private main = viewChild<ElementRef<HTMLElement>>('main');
 

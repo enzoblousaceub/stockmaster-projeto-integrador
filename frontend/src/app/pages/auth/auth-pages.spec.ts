@@ -128,6 +128,24 @@ describe('telas de autenticação', () => {
     expect(allText(el)).not.toMatch(NO_EMAIL);
   });
 
+  it('configurações: logout com falha mantém a sessão e avisa (não finge que saiu)', () => {
+    auth.logout.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+    const f = TestBed.createComponent(SettingsDialogComponent);
+    f.detectChanges();
+    f.componentInstance.logout();
+    expect(auth.clear).not.toHaveBeenCalled();
+    expect(router.navigate).not.toHaveBeenCalled();
+    expect(f.componentInstance.outLoading()).toBe(false);
+  });
+
+  it('código de ativação: lido soletrado por leitores de tela e sem aria-label no <code>', () => {
+    const f = TestBed.createComponent(CodeDialogComponent);
+    f.detectChanges();
+    const el: HTMLElement = f.nativeElement;
+    expect(el.querySelector('#activation-code')?.getAttribute('aria-label')).toBeNull();
+    expect(el.querySelector('.code-box .sr-only')?.textContent).toContain('K 7 Q M, 2 X P D, 9 H R T');
+  });
+
   // ---------- login ----------
   it('login com sucesso volta ao returnUrl seguro', () => {
     query = convertToParamMap({ returnUrl: '/products?q=abc' });
@@ -170,6 +188,7 @@ describe('telas de autenticação', () => {
     c.usuario.set('maria'); c.senha.set('x');
     c.submit();
     expect(c.wait()).toBe(3);
+    expect(c.waitNote()).toContain('3 s');
 
     auth.login.mockClear();
     c.submit(); // durante o bloqueio não envia
@@ -178,6 +197,7 @@ describe('telas de autenticação', () => {
     vi.advanceTimersByTime(3000);
     expect(c.wait()).toBe(0);
     expect(c.error()).toBe('');
+    expect(c.waitNote()).toBe('Você já pode tentar novamente.');
   });
 
   it('login com campos vazios não chama a API', () => {

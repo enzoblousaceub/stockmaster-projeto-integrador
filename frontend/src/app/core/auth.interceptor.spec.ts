@@ -82,6 +82,13 @@ describe('authInterceptor', () => {
     document.cookie = 'XSRF-TOKEN=; path=/; max-age=0';
   });
 
+  it('401 no retry (sessão revogada entre as tentativas) também expira a sessão', () => {
+    http.post('/api/products', {}).subscribe({ error: () => {} });
+    ctrl.expectOne('/api/products').flush({ code: 'csrf_invalid' }, { status: 403, statusText: 'Forbidden' });
+    ctrl.expectOne('/api/products').flush({ code: 'unauthenticated' }, { status: 401, statusText: 'Unauthorized' });
+    expect(auth.sessionExpired).toHaveBeenCalledTimes(1);
+  });
+
   it('403 csrf_invalid de novo no retry: devolve o erro, sem laço e sem deslogar', () => {
     let status = 0;
     http.post('/api/products', {}).subscribe({ error: (e) => (status = e.status) });

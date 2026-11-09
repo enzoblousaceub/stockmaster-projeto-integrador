@@ -1,4 +1,11 @@
-@if (!auth.ready()) {
+@if (auth.bootError()) {
+  <div class="boot boot--error" role="alert">
+    <img src="brand/mark.svg" alt="" width="48" height="48">
+    <h1>Servidor indisponível</h1>
+    <p>Não foi possível verificar a sua sessão. Verifique a conexão e tente novamente.</p>
+    <button type="button" class="boot-btn" (click)="auth.retryBoot()" id="btn-boot-retry">Tentar novamente</button>
+  </div>
+} @else if (!auth.ready()) {
   <div class="boot" role="status">
     <img src="brand/mark.svg" alt="" width="48" height="48">
     <span class="sr-only">Carregando…</span>

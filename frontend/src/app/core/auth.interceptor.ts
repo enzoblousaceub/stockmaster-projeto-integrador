@@ -35,7 +35,13 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
                 return next(req.clone({
                   headers: token ? req.headers.set('X-XSRF-TOKEN', token) : req.headers.delete('X-XSRF-TOKEN'),
                   context: req.context.set(CSRF_RETRIED, true)
-                }));
+                })).pipe(
+                  // sessão revogada entre as duas tentativas
+                  catchError((e: unknown) => {
+                    if (e instanceof HttpErrorResponse && e.status === 401) injector.get(AuthService).sessionExpired();
+                    return throwError(() => e);
+                  })
+                );
               })
             );
           }

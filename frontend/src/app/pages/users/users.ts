@@ -156,6 +156,8 @@ export class UsersComponent implements OnInit {
   }
 
   private fail(err: unknown): void {
-    this.snack.open(messageFor(parseProblem(err)), 'Fechar', { duration: 5000 });
+    const p = parseProblem(err);
+    if (p.status === 403 && p.code !== 'csrf_invalid') return; // o interceptor já avisou (sem permissão)
+    this.snack.open(messageFor(p), 'Fechar', { duration: 5000 });
   }
 }

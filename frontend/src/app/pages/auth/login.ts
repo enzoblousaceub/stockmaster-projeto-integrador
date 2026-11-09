@@ -24,6 +24,8 @@ export class LoginComponent implements OnDestroy {
   /** segundos restantes de bloqueio/limite (429) */
   readonly wait = signal(0);
   readonly waitText = computed(() => formatWait(this.wait()));
+  /** texto lido por leitores de tela: só no início e no fim da espera */
+  readonly waitNote = signal('');
 
   readonly activated = this.route.snapshot.queryParamMap.get('ativado') === '1';
   readonly expired = this.route.snapshot.queryParamMap.get('expirada') === '1';
@@ -43,6 +45,7 @@ export class LoginComponent implements OnDestroy {
     this.auth.login(usuario, senha).subscribe({
       next: () => {
         this.loading.set(false);
+        this.senha.set('');
         this.router.navigateByUrl(safeReturnUrl(this.route.snapshot.queryParamMap.get('returnUrl')));
       },
       error: (err) => {
@@ -59,11 +62,13 @@ export class LoginComponent implements OnDestroy {
   private startCountdown(seconds: number): void {
     clearInterval(this.timer);
     this.wait.set(seconds);
+    this.waitNote.set(`Tente novamente em ${formatWait(seconds)}.`);
     this.timer = setInterval(() => {
       this.wait.update((n) => n - 1);
       if (this.wait() <= 0) {
         clearInterval(this.timer);
         this.error.set('');
+        this.waitNote.set('Você já pode tentar novamente.');
       }
     }, 1000);
   }

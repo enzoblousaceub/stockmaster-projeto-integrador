@@ -115,7 +115,8 @@
 }
 .btn-primary { border: 1px solid var(--sm-primary); background: var(--sm-primary); color: var(--sm-on-primary); }
 .btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
-.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-primary:disabled,
+.btn-primary[aria-disabled='true'] { opacity: 0.6; cursor: not-allowed; }
 .btn-block { width: 100%; }
 
 .alert, .notice {

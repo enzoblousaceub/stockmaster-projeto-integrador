@@ -12,7 +12,7 @@ export function parseProblem(err: unknown): ApiProblem {
     title: body.title,
     detail: body.detail,
     errors: body.errors,
-    retryAfterSeconds: body.retryAfterSeconds ?? (header > 0 ? header : undefined)
+    retryAfterSeconds: Number.isFinite(body.retryAfterSeconds) ? body.retryAfterSeconds : (header > 0 ? header : undefined)
   };
 }
 
@@ -62,7 +62,7 @@ export const KNOWN_CODES = [
 
 /** Só devolve caminhos internos (evita open redirect via returnUrl). */
 export function safeReturnUrl(url: string | null | undefined): string {
-  if (!url || !url.startsWith('/') || url.startsWith('//') || url.startsWith('/\\')) return '/';
+  if (!url || url.length > 512 || /[\\\r\n\t]/.test(url) || !url.startsWith('/') || url.startsWith('//')) return '/';
   if (url.startsWith('/login') || url.startsWith('/ativar')) return '/';
   return url;
 }

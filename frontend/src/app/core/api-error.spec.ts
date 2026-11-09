@@ -15,6 +15,12 @@ describe('parseProblem', () => {
     expect(p.retryAfterSeconds).toBe(30);
   });
 
+  it('retryAfterSeconds não numérico no corpo é ignorado (sem "NaN s")', () => {
+    const p = parseProblem(new HttpErrorResponse({ status: 429, error: { code: 'rate_limited', retryAfterSeconds: 'abc' }, headers: new HttpHeaders({ 'Retry-After': '12' }) }));
+    expect(p.retryAfterSeconds).toBe(12);
+    expect(messageFor({ ...p, retryAfterSeconds: undefined })).not.toContain('NaN');
+  });
+
   it('status 0 vira code network', () => {
     expect(parseProblem(new HttpErrorResponse({ status: 0 })).code).toBe('network');
   });
@@ -65,6 +71,14 @@ describe('safeReturnUrl', () => {
     expect(safeReturnUrl('//evil.com')).toBe('/');
     expect(safeReturnUrl('/\\evil.com')).toBe('/');
     expect(safeReturnUrl(null)).toBe('/');
+  });
+
+  it('rejeita barra invertida, quebra de linha, tab e URLs enormes', () => {
+    expect(safeReturnUrl('/a\\b')).toBe('/');
+    expect(safeReturnUrl('/a\nb')).toBe('/');
+    expect(safeReturnUrl('/a\rb')).toBe('/');
+    expect(safeReturnUrl('/a\tb')).toBe('/');
+    expect(safeReturnUrl('/' + 'a'.repeat(600))).toBe('/');
   });
 
   it('não volta para login/ativar', () => {

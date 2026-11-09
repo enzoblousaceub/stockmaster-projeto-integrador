@@ -1,6 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatIconModule } from '@angular/material/icon';
 import { AuthService } from '../../core/auth.service';
 import { messageFor, parseProblem } from '../../core/api-error';
@@ -125,6 +126,7 @@ export class SettingsDialogComponent {
   readonly auth = inject(AuthService);
   private router = inject(Router);
   private ref = inject(MatDialogRef<SettingsDialogComponent>);
+  private snack = inject(MatSnackBar);
 
   readonly themes: { value: ThemeMode; label: string; icon: string }[] = [
     { value: 'light', label: 'Claro', icon: 'light_mode' },
@@ -162,15 +164,19 @@ export class SettingsDialogComponent {
     });
   }
 
-  /** Encerra TODAS as sessões da pessoa. Mesmo se a chamada falhar, limpa o estado local. */
+  /** Encerra TODAS as sessões da pessoa. Se a chamada falhar, mantém a tela e avisa. */
   logout(): void {
     if (this.outLoading()) return;
     this.outLoading.set(true);
-    const done = () => {
-      this.auth.clear();
-      this.ref.close();
-      this.router.navigate(['/login']);
-    };
-    this.auth.logout().subscribe({ next: done, error: done });
+    this.auth.logout().subscribe({
+      next: () => {
+        this.ref.close();
+        this.router.navigate(['/login']);
+      },
+      error: () => {
+        this.outLoading.set(false);
+        this.snack.open('Não foi possível encerrar a sessão. Tente novamente.', 'Fechar', { duration: 5000 });
+      }
+    });
   }
 }

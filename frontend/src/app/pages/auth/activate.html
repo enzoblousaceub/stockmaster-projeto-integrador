@@ -18,8 +18,10 @@
         <div class="alert" role="alert"><mat-icon aria-hidden="true">error</mat-icon><span>{{ error() }}</span></div>
       }
       @if (wait() > 0) {
-        <p class="wait" role="status">Tente novamente em <b class="num">{{ waitText() }}</b>.</p>
+        <p class="wait" aria-hidden="true">Tente novamente em <b class="num">{{ waitText() }}</b>.</p>
       }
+      <!-- anuncia só no início e no fim da espera (a contagem visual é aria-hidden) -->
+      <div class="sr-only" role="status" aria-live="polite">{{ waitNote() }}</div>
 
       <form (submit)="$event.preventDefault(); submit()" novalidate>
         <div class="field">
@@ -47,7 +49,7 @@
               maxlength="128" aria-describedby="senha-hint" [attr.aria-invalid]="passwordError() ? 'true' : null"
               [value]="novaSenha()" (input)="novaSenha.set(n.value)">
             <button type="button" class="trail" (click)="showPassword.set(!showPassword())"
-              [attr.aria-label]="showPassword() ? 'Ocultar senha' : 'Mostrar senha'" [attr.aria-pressed]="showPassword()">
+              aria-label="Mostrar senha" [attr.aria-pressed]="showPassword()">
               <mat-icon aria-hidden="true">{{ showPassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
             </button>
           </div>
@@ -62,7 +64,7 @@
           </div>
           @if (passwordError()) { <span class="field-error" role="alert">{{ passwordError() }}</span> }
         </div>
-        <button class="btn btn-primary btn-block" type="submit" [disabled]="loading() || wait() > 0" id="btn-ativar">
+        <button class="btn btn-primary btn-block" type="submit" [attr.aria-disabled]="loading() || wait() > 0 ? 'true' : null" id="btn-ativar">
           {{ loading() ? 'Ativando…' : 'Ativar e ir para o login' }}
         </button>
       </form>

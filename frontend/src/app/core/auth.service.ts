@@ -1,7 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { HttpClient, HttpContext } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpErrorResponse } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { Observable, firstValueFrom, tap } from 'rxjs';
+import { Observable, catchError, firstValueFrom, of, tap, throwError } from 'rxjs';
 import { Me } from '../models/auth.model';
 import { PUBLIC_AUTH } from './http-context';
 
@@ -14,8 +14,10 @@ export class AuthService {
 
   /** Sessão atual (null = sem sessão). */
   readonly user = signal<Me | null>(null);
-  /** true depois do primeiro GET /api/auth/me (boot). */
+  /** true depois do primeiro GET /api/auth/me bem-sucedido (200 ou 401). */
   readonly ready = signal(false);
+  /** servidor indisponível no boot (rede/5xx): NÃO é "sem sessão". */
+  readonly bootError = signal(false);
 
   readonly isLoggedIn = computed(() => this.user() !== null);
   readonly isAdmin = computed(() => this.user()?.perfil === 'Admin');
@@ -33,11 +35,28 @@ export class AuthService {
   private async fetchMe(): Promise<void> {
     try {
       this.user.set(await firstValueFrom(this.http.get<Me>('/api/auth/me', { context: PUBLIC() })));
-    } catch {
-      this.user.set(null);
-    } finally {
+      this.bootError.set(false);
       this.ready.set(true);
+    } catch (e) {
+      if (e instanceof HttpErrorResponse && e.status === 401) {
+        // sem sessão (normal)
+        this.user.set(null);
+        this.bootError.set(false);
+        this.ready.set(true);
+      } else {
+        // rede/5xx: não decide "sem sessão"; mostra "servidor indisponível" com nova tentativa
+        this.bootError.set(true);
+        this.loading = undefined;
+      }
     }
+  }
+
+  /** Nova tentativa do boot depois de uma falha de rede/servidor. */
+  async retryBoot(): Promise<void> {
+    this.bootError.set(false);
+    this.loading = undefined;
+    await this.ensureLoaded();
+    if (this.ready()) this.router.navigateByUrl(location.pathname + location.search, { replaceUrl: true });
   }
 
   /** Renova o cookie XSRF-TOKEN (usado no retry de csrf_invalid). */
@@ -53,7 +72,11 @@ export class AuthService {
 
   /** Encerra a sessão em TODOS os dispositivos (decisão do produto). */
   logout(): Observable<void> {
-    return this.http.post<void>('/api/auth/logout', null).pipe(tap(() => this.clear()));
+    // 401 = a sessão já não existe: conta como sucesso. Outros erros sobem (a tela NÃO finge que saiu).
+    return this.http.post<void>('/api/auth/logout', null, { context: PUBLIC() }).pipe(
+      catchError((err) => (err instanceof HttpErrorResponse && err.status === 401 ? of(undefined) : throwError(() => err))),
+      tap(() => this.clear())
+    );
   }
 
   changePassword(senhaAtual: string, novaSenha: string): Observable<void> {
@@ -71,10 +94,11 @@ export class AuthService {
 
   /** 401 fora de login/ativar: limpa o estado e volta ao login guardando o destino. */
   sessionExpired(): void {
-    const wasLogged = this.isLoggedIn();
+    // 401s em paralelo: só o primeiro (com sessão) navega; os demais não sobrescrevem returnUrl/aviso
+    if (!this.isLoggedIn()) return;
     this.clear();
     const url = this.router.url;
     if (url.startsWith('/login') || url.startsWith('/ativar')) return;
-    this.router.navigate(['/login'], { queryParams: wasLogged && url !== '/' ? { returnUrl: url, expirada: 1 } : { expirada: wasLogged ? 1 : null } });
+    this.router.navigate(['/login'], { queryParams: url !== '/' ? { returnUrl: url, expirada: 1 } : { expirada: 1 } });
   }
 }

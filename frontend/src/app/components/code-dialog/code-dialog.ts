@@ -28,13 +28,15 @@ export interface CodeDialogData {
         <b>não será exibido de novo</b>.
       </p>
       <div class="code-box">
-        <code id="activation-code" class="num" tabindex="0" aria-label="Código de ativação">{{ data.code }}</code>
+        <span class="sr-only">Código de ativação, soletrado: {{ spelled }}.</span>
+        <code id="activation-code" class="num" tabindex="0" aria-hidden="false">{{ data.code }}</code>
         <button type="button" class="btn btn-outline" (click)="copy()" id="btn-copy">
           <mat-icon aria-hidden="true">{{ copied() ? 'check' : 'content_copy' }}</mat-icon>
           <span>{{ copied() ? 'Copiado' : 'Copiar' }}</span>
         </button>
       </div>
       <div class="sr-only" role="status" aria-live="polite">{{ copied() ? 'Código copiado' : '' }}</div>
+      @if (!copied()) { <p class="hint">Copie o código antes de concluir: ele não poderá ser consultado depois.</p> }
       @if (failed()) { <p class="hint" role="alert">Não foi possível copiar automaticamente. Selecione o código e copie manualmente.</p> }
       <p class="hint">{{ data.usuario }} ativa o acesso em <b>/ativar</b>, com o usuário, o código e uma nova senha.</p>
     </mat-dialog-content>
@@ -62,6 +64,8 @@ export interface CodeDialogData {
 export class CodeDialogComponent {
   readonly data = inject<CodeDialogData>(MAT_DIALOG_DATA);
   readonly copied = signal(false);
+  /** "K 7 Q M, 2 X P D, ..." para leitores de tela (é a única chance de ouvir o código) */
+  readonly spelled = this.data.code.split('-').map((g) => g.split('').join(' ')).join(', ');
   readonly failed = signal(false);
 
   async copy(): Promise<void> {
