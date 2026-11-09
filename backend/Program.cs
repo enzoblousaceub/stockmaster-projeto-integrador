@@ -129,6 +129,24 @@ app.UseForwardedHeaders();
 app.UseSecurityHeaders(BuildCsp(app.Environment), hsts: !app.Environment.IsDevelopment());
 if (corsOrigins.Length > 0) app.UseCors("Configured");
 app.UseRateLimiter();
+// Arquivos estaticos do Angular (JS/CSS/icones) sao publicos: servidos ANTES da autenticacao/autorizacao,
+// senao a politica deny-by-default exige login ate para baixar o JS da tela de login (pagina em branco).
+var browserPath = Path.Combine(builder.Environment.ContentRootPath, "wwwroot", "browser");
+var provider = new Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider();
+provider.Mappings[".webmanifest"] = "application/manifest+json";
+var spaFiles = new StaticFileOptions { ContentTypeProvider = provider };
+if (Directory.Exists(browserPath))
+{
+    var fileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(browserPath);
+    spaFiles.FileProvider = fileProvider;
+    app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = fileProvider });
+}
+else
+{
+    app.UseDefaultFiles();
+}
+app.UseStaticFiles(spaFiles);
+
 app.UseHttpsRequiredForSecureCookies(app.Configuration);
 app.UseAuthentication();
 app.UseCsrfProtection();
@@ -142,37 +160,8 @@ app.MapGet("/healthz", async (AppDbContext db, CancellationToken ct) =>
 // /api/* inexistente: 404 (401 sem sessao), nunca o index.html do SPA
 app.MapFallback("/api/{**rest}", (HttpContext ctx) => Results.Problem(statusCode: 404, title: "Not Found"));
 
-// Serve Angular static files
-var browserPath = Path.Combine(builder.Environment.ContentRootPath, "wwwroot", "browser");
-var provider = new Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider();
-provider.Mappings[".webmanifest"] = "application/manifest+json";
-
-if (Directory.Exists(browserPath))
-{
-    app.UseDefaultFiles(new DefaultFilesOptions
-    {
-        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(browserPath)
-    });
-    app.UseStaticFiles(new StaticFileOptions
-    {
-        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(browserPath),
-        ContentTypeProvider = provider
-    });
-    app.MapFallbackToFile("index.html", new StaticFileOptions
-    {
-        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(browserPath),
-        ContentTypeProvider = provider
-    }).AllowAnonymous();
-}
-else
-{
-    app.UseDefaultFiles();
-    app.UseStaticFiles(new StaticFileOptions
-    {
-        ContentTypeProvider = provider
-    });
-    app.MapFallbackToFile("index.html").AllowAnonymous();
-}
+// SPA: index.html para qualquer rota que nao seja /api (os arquivos estaticos ja sairam antes da autenticacao)
+app.MapFallbackToFile("index.html", spaFiles).AllowAnonymous();
 
 // Aplica migrations (EF usa advisory lock, seguro com mais de uma instancia) e seed opcional
 using (var scope = app.Services.CreateScope())
@@ -181,6 +170,7 @@ using (var scope = app.Services.CreateScope())
     db.Database.Migrate();
     if (app.Configuration.GetValue<bool>("Seed:Enabled")) DbInitializer.Initialize(db);
     await AdminBootstrap.RunAsync(app.Services);
+    if (app.Configuration.GetValue<bool>("Seed:Enabled")) await TestUserSeed.RunAsync(app.Services);
 }
 
 // Em producao as chaves de sessao no Postgres precisam estar cifradas
