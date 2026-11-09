@@ -2,6 +2,8 @@ using backend.Data;
 using backend.DTOs;
 using backend.Models;
 using System.ComponentModel.DataAnnotations;
+using backend.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -95,6 +97,7 @@ namespace backend.Controllers
         }
 
         // POST: api/products
+        [Authorize(Policy = AuthSetup.AdminPolicy)]
         [HttpPost]
         public async Task<ActionResult<Product>> CreateProduct(CreateProductDto dto)
         {
@@ -117,6 +120,7 @@ namespace backend.Controllers
         }
 
         // PUT: api/products/5
+        [Authorize(Policy = AuthSetup.AdminPolicy)]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateProduct(int id, UpdateProductDto dto)
         {
@@ -142,6 +146,7 @@ namespace backend.Controllers
 
         // PATCH: api/products/5/quantity  {"delta": -1}
         // Ajuste atomico no banco (Quantity = Quantity + delta), sem ler-modificar-gravar: seguro com cliques concorrentes.
+        [Authorize(Policy = AuthSetup.AdminPolicy)]
         [HttpPatch("{id}/quantity")]
         public async Task<ActionResult<Product>> AdjustQuantity(int id, AdjustQuantityDto dto, CancellationToken ct)
         {
@@ -178,6 +183,7 @@ namespace backend.Controllers
         }
 
         // DELETE: api/products/5
+        [Authorize(Policy = AuthSetup.AdminPolicy)]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteProduct(int id)
         {

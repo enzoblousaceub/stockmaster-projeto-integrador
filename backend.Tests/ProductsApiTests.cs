@@ -13,7 +13,7 @@ public class ProductsApiTests : IClassFixture<ApiFactory>
 {
     private readonly HttpClient _client;
 
-    public ProductsApiTests(ApiFactory factory) => _client = factory.CreateClient();
+    public ProductsApiTests(ApiFactory factory) => _client = factory.CreateAdminClient();
 
     private static object NewProduct(string name, string category = "Teste", int quantity = 5,
         decimal price = 10.5m, int minStock = 2) =>

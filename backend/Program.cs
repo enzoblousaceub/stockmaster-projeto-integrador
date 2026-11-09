@@ -3,6 +3,8 @@ using backend.Security;
 using Microsoft.AspNetCore.HttpOverrides;
 using System.Threading.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +21,32 @@ builder.Services.AddProblemDetails(options =>
             System.Diagnostics.Activity.Current?.Id ?? ctx.HttpContext.TraceIdentifier;
     };
 });
+
+// Erros de validacao: ProblemDetails com code "validation_error" (chaves em camelCase na area de auth)
+builder.Services.Configure<ApiBehaviorOptions>(o =>
+{
+    o.InvalidModelStateResponseFactory = ctx =>
+    {
+        var factory = ctx.HttpContext.RequestServices.GetRequiredService<Microsoft.AspNetCore.Mvc.Infrastructure.ProblemDetailsFactory>();
+        var ms = ctx.ModelState;
+        if (ctx.HttpContext.Request.Path.StartsWithSegments("/api/auth") || ctx.HttpContext.Request.Path.StartsWithSegments("/api/users"))
+        {
+            var camel = new Microsoft.AspNetCore.Mvc.ModelBinding.ModelStateDictionary();
+            foreach (var (key, entry) in ms)
+            {
+                var k = key.Length > 0 && char.IsUpper(key[0]) ? char.ToLowerInvariant(key[0]) + key[1..] : key;
+                foreach (var e in entry.Errors) camel.AddModelError(k, e.ErrorMessage);
+            }
+            ms = camel;
+        }
+        var pd = factory.CreateValidationProblemDetails(ctx.HttpContext, ms);
+        pd.Extensions["code"] = "validation_error";
+        return new BadRequestObjectResult(pd) { ContentTypes = { "application/problem+json" } };
+    };
+});
+
+// Autenticacao por cookie (HttpOnly, SameSite=Strict), antiforgery, deny-by-default e Data Protection no Postgres
+builder.Services.AddAppAuth(builder.Configuration);
 
 // PostgreSQL (DATABASE_URL no Render; ConnectionStrings:Default em dev/testes)
 var connectionString = DatabaseConnection.Resolve(builder.Configuration);
@@ -101,12 +129,17 @@ app.UseForwardedHeaders();
 app.UseSecurityHeaders(BuildCsp(app.Environment), hsts: !app.Environment.IsDevelopment());
 if (corsOrigins.Length > 0) app.UseCors("Configured");
 app.UseRateLimiter();
+app.UseAuthentication();
+app.UseCsrfProtection();
 app.UseAuthorization();
 app.MapControllers();
 
 // Healthcheck publico (Docker/Render): so informa ok/indisponivel, sem detalhes
 app.MapGet("/healthz", async (AppDbContext db, CancellationToken ct) =>
-    await db.Database.CanConnectAsync(ct) ? Results.Ok(new { status = "ok" }) : Results.StatusCode(503));
+    await db.Database.CanConnectAsync(ct) ? Results.Ok(new { status = "ok" }) : Results.StatusCode(503)).AllowAnonymous();
+
+// /api/* inexistente: 404 (401 sem sessao), nunca o index.html do SPA
+app.MapFallback("/api/{**rest}", (HttpContext ctx) => Results.Problem(statusCode: 404, title: "Not Found"));
 
 // Serve Angular static files
 var browserPath = Path.Combine(builder.Environment.ContentRootPath, "wwwroot", "browser");
@@ -128,7 +161,7 @@ if (Directory.Exists(browserPath))
     {
         FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(browserPath),
         ContentTypeProvider = provider
-    });
+    }).AllowAnonymous();
 }
 else
 {
@@ -137,7 +170,7 @@ else
     {
         ContentTypeProvider = provider
     });
-    app.MapFallbackToFile("index.html");
+    app.MapFallbackToFile("index.html").AllowAnonymous();
 }
 
 // Aplica migrations (EF usa advisory lock, seguro com mais de uma instancia) e seed opcional
@@ -146,6 +179,7 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
     if (app.Configuration.GetValue<bool>("Seed:Enabled")) DbInitializer.Initialize(db);
+    await AdminBootstrap.RunAsync(app.Services);
 }
 
 app.Run();

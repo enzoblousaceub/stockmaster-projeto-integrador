@@ -8,7 +8,7 @@ public class QuantityPatchTests : IClassFixture<ApiFactory>
 {
     private readonly HttpClient _client;
 
-    public QuantityPatchTests(ApiFactory factory) => _client = factory.CreateClient();
+    public QuantityPatchTests(ApiFactory factory) => _client = factory.CreateAdminClient();
 
     private async Task<ProductResponse> CreateAsync(int quantity)
     {

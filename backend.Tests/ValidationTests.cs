@@ -7,7 +7,7 @@ public class ValidationTests : IClassFixture<ApiFactory>
 {
     private readonly HttpClient _client;
 
-    public ValidationTests(ApiFactory factory) => _client = factory.CreateClient();
+    public ValidationTests(ApiFactory factory) => _client = factory.CreateAdminClient();
 
     private static object Body(int quantity = 1, decimal price = 1m, int minStock = 1,
         string name = "Item", string category = "Cat", string? description = null) =>

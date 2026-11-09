@@ -15,7 +15,7 @@ public class ErrorHandlingTests : IClassFixture<ApiFactory>
     public ErrorHandlingTests(ApiFactory factory)
     {
         _factory = factory;
-        _client = factory.CreateClient();
+        _client = factory.CreateAdminClient();
     }
 
     [Fact]
@@ -66,7 +66,7 @@ public class ErrorHandlingTests : IClassFixture<ApiFactory>
             await db.Database.ExecuteSqlRawAsync("DROP TABLE \"Products\"");
         }
 
-        var resp = await factory.CreateClient().GetAsync("/api/products");
+        var resp = await factory.CreateAdminClient().GetAsync("/api/products");
         Assert.Equal(HttpStatusCode.InternalServerError, resp.StatusCode);
 
         var body = await resp.Content.ReadAsStringAsync();

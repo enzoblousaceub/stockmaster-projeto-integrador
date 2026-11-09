@@ -12,8 +12,8 @@ public class RateLimitTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task Writes_AreLimited_WithProblemDetailsAndRetryAfter()
     {
-        using var factory = _factory.WithWebHostBuilder(b => b.UseSetting("RateLimit:WritePerMinute", "3"));
-        var client = factory.CreateClient();
+        using var factory = _factory.WithWebHostBuilder(b => b.UseSetting("RateLimit:WritePerMinute", "4"));
+        var client = factory.CreateAdminClient();
         var body = new { name = "RL", category = "T", quantity = 1, price = 1, minStock = 0 };
 
         for (var i = 0; i < 3; i++)
@@ -32,7 +32,7 @@ public class RateLimitTests : IClassFixture<ApiFactory>
     public async Task Reads_AreLimited_ButHealthzAndStaticAreNot()
     {
         using var factory = _factory.WithWebHostBuilder(b => b.UseSetting("RateLimit:ReadPerMinute", "2"));
-        var client = factory.CreateClient();
+        var client = factory.CreateAdminClient();
 
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/products")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/products/categories")).StatusCode);
