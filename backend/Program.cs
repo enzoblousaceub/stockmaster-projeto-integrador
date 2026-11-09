@@ -183,6 +183,10 @@ using (var scope = app.Services.CreateScope())
     await AdminBootstrap.RunAsync(app.Services);
 }
 
+// Em producao as chaves de sessao no Postgres precisam estar cifradas
+if (app.Environment.IsProduction() && EnvKeyXmlEncryptor.ParseKey(app.Configuration["Auth:KeyEncryptionKey"]) is null)
+    app.Logger.LogError("Auth__KeyEncryptionKey ausente ou invalida (base64, >= 32 bytes): as chaves de sessao ficam em TEXTO no banco. Defina-a antes de liberar para usuarios.");
+
 app.Run();
 
 // CSP com o hash dos scripts inline do index.html publicado (se mudar o script, o hash acompanha o build)
