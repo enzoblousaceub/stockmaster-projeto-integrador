@@ -314,3 +314,10 @@ th[aria-sort='descending'] mat-icon { opacity: 1; }
 
   .pager { margin-bottom: 72px; }
 }
+
+/* Somente leitura (Visualizador) */
+.tbl.readonly .c-actions,
+.tbl.readonly .actions-col { display: none; }
+
+.card-ro { display: flex; align-items: baseline; justify-content: space-between; margin-top: 8px; color: var(--sm-text-2); }
+.card-ro b { color: var(--sm-text); font-size: 1.0625rem; }

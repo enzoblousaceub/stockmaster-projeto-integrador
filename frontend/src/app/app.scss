@@ -238,3 +238,68 @@
 @media (max-width: 519.98px) {
   .brand .brand-name { display: none; }
 }
+
+/* Boot (descobrindo a sessão) */
+.boot {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--sm-bg);
+
+  img { border-radius: 12px; animation: pulse 1.2s ease-in-out infinite; }
+}
+@keyframes pulse { 50% { opacity: 0.45; } }
+
+/* Usuário logado na topbar (desktop/tablet) */
+.user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--sm-radius);
+  background: transparent;
+  color: var(--sm-text);
+  font: inherit;
+  cursor: pointer;
+
+  &:hover { background: var(--sm-surface-2); }
+
+  .avatar {
+    display: inline-flex;
+    width: 36px;
+    height: 36px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--sm-primary-soft);
+    color: var(--sm-primary);
+    font-weight: 700;
+    font-size: 0.8125rem;
+  }
+
+  .user-txt { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.15; text-align: left; }
+  .user-txt small { color: var(--sm-text-2); font-size: 0.75rem; }
+}
+
+.nav-section {
+  list-style: none;
+  padding: 16px 12px 4px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--sm-text-2);
+}
+
+@media (max-width: 1099.98px) {
+  .nav-section { display: none; }
+  .user-txt { display: none !important; }
+}
+
+/* Mobile: usuário e Sair ficam em Configurações > Conta */
+@media (max-width: 767.98px) {
+  .user-chip, .logout-btn--top { display: none; }
+}

@@ -1,0 +1,65 @@
+<div class="auth">
+  <aside class="auth-brand" aria-hidden="true">
+    <div class="brand"><img src="brand/mark.svg" alt="" width="36" height="36">Stock Master</div>
+    <div>
+      <h2>Controle de estoque, simples e seguro.</h2>
+      <p>Acompanhe produtos, alertas de reposição e o valor do seu estoque em um só lugar.</p>
+      <ul>
+        <li><mat-icon>inventory_2</mat-icon> Produtos e categorias</li>
+        <li><mat-icon>notifications_active</mat-icon> Alertas de reposição</li>
+        <li><mat-icon>lock</mat-icon> Acesso por perfil</li>
+      </ul>
+    </div>
+    <small>© Stock Master</small>
+  </aside>
+
+  <main class="auth-form" id="main-content">
+    <div class="auth-card">
+      <div class="brand brand-mobile"><img src="brand/mark.svg" alt="" width="36" height="36">Stock Master</div>
+      <h1>Entrar</h1>
+      <p class="sub">Use seu usuário e senha para acessar o sistema.</p>
+
+      @if (activated) {
+        <div class="notice notice--ok" role="status"><mat-icon aria-hidden="true">check_circle</mat-icon><span>Acesso ativado. Entre com a senha que você acabou de criar.</span></div>
+      }
+      @if (expired && !error()) {
+        <div class="notice" role="status"><mat-icon aria-hidden="true">info</mat-icon><span>Sua sessão terminou. Entre novamente para continuar.</span></div>
+      }
+      @if (error()) {
+        <div class="alert" role="alert"><mat-icon aria-hidden="true">error</mat-icon><span>{{ error() }}</span></div>
+      }
+      @if (wait() > 0) {
+        <p class="wait" role="status">Tente novamente em <b class="num">{{ waitText() }}</b>.</p>
+      }
+
+      <form (submit)="$event.preventDefault(); submit()" novalidate>
+        <div class="field">
+          <label for="login-usuario">Usuário</label>
+          <div class="input has-lead">
+            <mat-icon class="lead" aria-hidden="true">person</mat-icon>
+            <input #u id="login-usuario" name="usuario" type="text" autocomplete="username" autocapitalize="none"
+              spellcheck="false" enterkeyhint="next" [value]="usuario()" (input)="usuario.set(u.value)">
+          </div>
+        </div>
+        <div class="field">
+          <label for="login-senha">Senha</label>
+          <div class="input has-lead has-trail">
+            <mat-icon class="lead" aria-hidden="true">lock</mat-icon>
+            <input #p id="login-senha" name="senha" [type]="showPassword() ? 'text' : 'password'" autocomplete="current-password"
+              enterkeyhint="go" [value]="senha()" (input)="senha.set(p.value)">
+            <button type="button" class="trail" (click)="showPassword.set(!showPassword())"
+              [attr.aria-label]="showPassword() ? 'Ocultar senha' : 'Mostrar senha'" [attr.aria-pressed]="showPassword()">
+              <mat-icon aria-hidden="true">{{ showPassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+            </button>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-block" type="submit" [disabled]="loading() || wait() > 0" id="btn-login">
+          {{ loading() ? 'Entrando…' : 'Entrar' }}
+        </button>
+      </form>
+
+      <p class="hint center">Recebeu um código de ativação? <a class="link" routerLink="/ativar">Ativar acesso</a></p>
+      <p class="hint center">Esqueceu a senha? Peça a um administrador para redefinir o seu acesso.</p>
+    </div>
+  </main>
+</div>

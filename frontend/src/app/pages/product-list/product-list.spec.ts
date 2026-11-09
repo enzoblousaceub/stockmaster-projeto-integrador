@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { provideZonelessChangeDetection } from '@angular/core';
+import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProductListComponent } from './product-list';
 import { ProductService } from '../../services/product.service';
 import { Product } from '../../models/product.model';
+import { AuthService } from '../../core/auth.service';
 
 const mk = (id: number, quantity: number): Product => ({
   id, name: `Produto ${id}`, category: 'Cat', quantity, price: 10, minStock: 2,
@@ -23,6 +24,7 @@ describe('ProductListComponent: ajuste rápido de quantidade (+/-)', () => {
   };
   let snack: { open: ReturnType<typeof vi.fn> };
   let cmp: ProductListComponent;
+  const canWrite = signal(true);
 
   const qty = (id = 1) => cmp.products().find((p) => p.id === id)!.quantity;
 
@@ -35,6 +37,7 @@ describe('ProductListComponent: ajuste rápido de quantidade (+/-)', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
+    canWrite.set(true);
     service = {
       getProducts: vi.fn(),
       getCategories: vi.fn(() => of([])),
@@ -48,6 +51,7 @@ describe('ProductListComponent: ajuste rápido de quantidade (+/-)', () => {
         provideRouter([]),
         { provide: ProductService, useValue: service },
         { provide: MatSnackBar, useValue: snack },
+        { provide: AuthService, useValue: { canWrite } },
         { provide: ActivatedRoute, useValue: { queryParamMap: of(convertToParamMap({})) } }
       ]
     });
@@ -220,5 +224,37 @@ describe('ProductListComponent: ajuste rápido de quantidade (+/-)', () => {
     vi.advanceTimersByTime(400);
 
     expect(service.adjustQuantity).toHaveBeenCalledWith(1, 1);
+  });
+
+  it('Visualizador: sem +/-, editar, excluir, Novo produto nem FAB (só leitura)', () => {
+    canWrite.set(false);
+    service.getProducts.mockReturnValue(of([mk(1, 5)]));
+    const f = TestBed.createComponent(ProductListComponent);
+    f.detectChanges();
+    const el: HTMLElement = f.nativeElement;
+    expect(el.querySelector('.stepper')).toBeNull();
+    expect(el.querySelector('.icon-act')).toBeNull();
+    expect(el.querySelector('#btn-new-product')).toBeNull();
+    expect(el.querySelector('#fab-new-product')).toBeNull();
+    expect(el.querySelector('.card-ro')?.textContent).toContain('5');
+  });
+
+  it('Admin: vê os controles de escrita', () => {
+    service.getProducts.mockReturnValue(of([mk(1, 5)]));
+    const f = TestBed.createComponent(ProductListComponent);
+    f.detectChanges();
+    const el: HTMLElement = f.nativeElement;
+    expect(el.querySelector('.stepper')).toBeTruthy();
+    expect(el.querySelector('#btn-new-product')).toBeTruthy();
+    expect(el.querySelector('#fab-new-product')).toBeTruthy();
+  });
+
+  it('403 ao ajustar: reverte a quantidade sem segundo aviso (o interceptor já avisou)', () => {
+    setup();
+    service.adjustQuantity.mockReturnValue(new Observable((s) => s.error(new HttpErrorResponse({ status: 403, error: { code: 'forbidden' } }))));
+    cmp.adjust(cmp.products()[0], 1);
+    vi.advanceTimersByTime(400);
+    expect(qty()).toBe(5);
+    expect(snack.open).not.toHaveBeenCalled();
   });
 });

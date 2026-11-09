@@ -1,0 +1,73 @@
+<div class="auth">
+  <aside class="auth-brand" aria-hidden="true">
+    <div class="brand"><img src="brand/mark.svg" alt="" width="36" height="36">Stock Master</div>
+    <div>
+      <h2>Bem-vindo(a)!</h2>
+      <p>Ative seu acesso com o código que o administrador enviou e escolha a sua senha.</p>
+    </div>
+    <small>© Stock Master</small>
+  </aside>
+
+  <main class="auth-form" id="main-content">
+    <div class="auth-card">
+      <div class="brand brand-mobile"><img src="brand/mark.svg" alt="" width="36" height="36">Stock Master</div>
+      <h1>Ativar acesso</h1>
+      <p class="sub">Informe seu usuário, o código recebido e crie uma senha.</p>
+
+      @if (error()) {
+        <div class="alert" role="alert"><mat-icon aria-hidden="true">error</mat-icon><span>{{ error() }}</span></div>
+      }
+      @if (wait() > 0) {
+        <p class="wait" role="status">Tente novamente em <b class="num">{{ waitText() }}</b>.</p>
+      }
+
+      <form (submit)="$event.preventDefault(); submit()" novalidate>
+        <div class="field">
+          <label for="ativar-usuario">Usuário</label>
+          <div class="input has-lead">
+            <mat-icon class="lead" aria-hidden="true">person</mat-icon>
+            <input #u id="ativar-usuario" name="usuario" type="text" autocomplete="username" autocapitalize="none"
+              spellcheck="false" [value]="usuario()" (input)="usuario.set(u.value)">
+          </div>
+        </div>
+        <div class="field">
+          <label for="ativar-codigo">Código de ativação</label>
+          <div class="input has-lead">
+            <mat-icon class="lead" aria-hidden="true">vpn_key</mat-icon>
+            <input #c id="ativar-codigo" name="codigo" type="text" autocomplete="one-time-code" autocapitalize="characters"
+              spellcheck="false" class="mono" maxlength="20" aria-describedby="codigo-hint" [value]="codigo()" (input)="codigo.set(c.value)">
+          </div>
+          <span class="hint" id="codigo-hint">Com ou sem hífens, maiúsculas ou minúsculas.</span>
+        </div>
+        <div class="field">
+          <label for="ativar-senha">Nova senha</label>
+          <div class="input has-lead has-trail">
+            <mat-icon class="lead" aria-hidden="true">lock</mat-icon>
+            <input #n id="ativar-senha" name="novaSenha" [type]="showPassword() ? 'text' : 'password'" autocomplete="new-password"
+              maxlength="128" aria-describedby="senha-hint" [attr.aria-invalid]="passwordError() ? 'true' : null"
+              [value]="novaSenha()" (input)="novaSenha.set(n.value)">
+            <button type="button" class="trail" (click)="showPassword.set(!showPassword())"
+              [attr.aria-label]="showPassword() ? 'Ocultar senha' : 'Mostrar senha'" [attr.aria-pressed]="showPassword()">
+              <mat-icon aria-hidden="true">{{ showPassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+            </button>
+          </div>
+          <span class="hint" id="senha-hint">De 8 a 128 caracteres. Evite senhas comuns.</span>
+        </div>
+        <div class="field">
+          <label for="ativar-repetir">Repetir a senha</label>
+          <div class="input has-lead">
+            <mat-icon class="lead" aria-hidden="true">lock</mat-icon>
+            <input #r id="ativar-repetir" name="repetir" [type]="showPassword() ? 'text' : 'password'" autocomplete="new-password"
+              maxlength="128" [attr.aria-invalid]="passwordError() ? 'true' : null" [value]="repetir()" (input)="repetir.set(r.value)">
+          </div>
+          @if (passwordError()) { <span class="field-error" role="alert">{{ passwordError() }}</span> }
+        </div>
+        <button class="btn btn-primary btn-block" type="submit" [disabled]="loading() || wait() > 0" id="btn-ativar">
+          {{ loading() ? 'Ativando…' : 'Ativar e ir para o login' }}
+        </button>
+      </form>
+
+      <p class="hint center"><a class="link" routerLink="/login">Já ativou? Entrar</a></p>
+    </div>
+  </main>
+</div>

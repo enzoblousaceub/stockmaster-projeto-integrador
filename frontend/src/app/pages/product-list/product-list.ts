@@ -10,6 +10,7 @@ import { MatPaginatorIntl, MatPaginatorModule, PageEvent } from '@angular/materi
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Injectable } from '@angular/core';
 import { ProductService } from '../../services/product.service';
+import { AuthService } from '../../core/auth.service';
 import { Product } from '../../models/product.model';
 import { DeleteDialogComponent } from '../../components/delete-dialog/delete-dialog';
 
@@ -47,6 +48,7 @@ export class ProductListComponent implements OnInit, OnDestroy {
   private dialog = inject(MatDialog);
   private snackBar = inject(MatSnackBar);
   private destroyRef = inject(DestroyRef);
+  readonly canWrite = inject(AuthService).canWrite;
 
   readonly state = signal<'loading' | 'error' | 'ready'>('loading');
   readonly products = signal<Product[]>([]);
@@ -256,7 +258,7 @@ export class ProductListComponent implements OnInit, OnDestroy {
           err.status === 409 ? `Estoque de "${name}" não pode ficar fora de 0 a 1.000.000. Quantidade restaurada.`
           : err.status === 429 ? `Muitas requisições${retry > 0 ? `. Tente de novo em ${retry} s` : '. Aguarde um instante'}. Quantidade restaurada.`
           : `Não foi possível atualizar "${name}". Quantidade restaurada.`;
-        this.snackBar.open(msg, 'Fechar', { duration: 4000 });
+        if (err.status !== 403) this.snackBar.open(msg, 'Fechar', { duration: 4000 });
         this.endInflight(id);
       }
     });

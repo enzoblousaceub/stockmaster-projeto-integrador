@@ -5,6 +5,7 @@ import { filter, map } from 'rxjs';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDialog } from '@angular/material/dialog';
 import { SettingsDialogComponent } from './components/settings-dialog/settings-dialog';
+import { AuthService } from './core/auth.service';
 
 @Component({
   selector: 'app-root',
@@ -16,6 +17,19 @@ import { SettingsDialogComponent } from './components/settings-dialog/settings-d
 export class AppComponent {
   private router = inject(Router);
   private dialog = inject(MatDialog);
+  readonly auth = inject(AuthService);
+
+  constructor() {
+    this.auth.ensureLoaded(); // descobre a sessão no boot (GET /api/auth/me)
+  }
+
+  readonly initials = computed(() => (this.auth.user()?.usuario ?? '').slice(0, 2).toUpperCase());
+
+  /** Encerra a sessão em TODOS os dispositivos; mesmo se falhar, limpa o estado local. */
+  logout(): void {
+    const done = () => { this.auth.clear(); this.router.navigate(['/login']); };
+    this.auth.logout().subscribe({ next: done, error: done });
+  }
   private main = viewChild<ElementRef<HTMLElement>>('main');
 
   private url = toSignal(

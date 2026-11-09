@@ -4,10 +4,12 @@
       <h1>Produtos</h1>
       <p class="subtitle">Gerencie os itens do seu estoque</p>
     </div>
+    @if (canWrite()) {
     <a class="btn btn-primary btn-new" routerLink="/products/new" id="btn-new-product">
       <mat-icon aria-hidden="true">add</mat-icon>
       <span>Novo produto</span>
     </a>
+    }
   </header>
 
   <div class="sr-only" role="status" aria-live="polite">{{ announcement() }}</div>
@@ -74,15 +76,17 @@
             <mat-icon aria-hidden="true">inventory_2</mat-icon>
             <h2>Nenhum produto cadastrado</h2>
             <p>Cadastre o primeiro item para começar a controlar o estoque.</p>
-            <a class="btn btn-primary" routerLink="/products/new">
+            @if (canWrite()) {
+              <a class="btn btn-primary" routerLink="/products/new">
               <mat-icon aria-hidden="true">add</mat-icon><span>Cadastrar produto</span>
             </a>
+            }
           </div>
         }
       } @else {
         <!-- Tabela (tablet/desktop) -->
         <div class="panel table-panel">
-          <table class="tbl">
+          <table class="tbl" [class.readonly]="!canWrite()">
             <caption class="sr-only">Lista de produtos</caption>
             <colgroup>
               <col class="c-name"><col class="c-cat"><col class="c-qty"><col class="c-price"><col class="c-status"><col class="c-actions">
@@ -129,6 +133,7 @@
                   <td class="num-col num">{{ p.price | currency: 'BRL' : 'symbol' : '1.2-2' }}</td>
                   <td><span class="chip" [class]="'chip chip--' + status(p)">{{ statusLabel(p) }}</span></td>
                   <td class="actions-col">
+                    @if (canWrite()) {
                     <a class="icon-act" [routerLink]="['/products', p.id, 'edit']" [attr.aria-label]="'Editar ' + p.name" title="Editar">
                       <mat-icon aria-hidden="true">edit</mat-icon>
                     </a>
@@ -136,6 +141,7 @@
                       [attr.aria-label]="'Excluir ' + p.name" title="Excluir">
                       <mat-icon aria-hidden="true">delete</mat-icon>
                     </button>
+                  }
                   </td>
                 </tr>
               }
@@ -159,6 +165,7 @@
                 <span class="price num">{{ p.price | currency: 'BRL' : 'symbol' : '1.2-2' }}</span>
                 <span class="min">mínimo <span class="num">{{ p.minStock }}</span></span>
               </div>
+              @if (canWrite()) {
               <div class="card-bottom">
                 <div class="stepper" role="group" [attr.aria-label]="'Quantidade de ' + p.name">
                   <button type="button" (click)="adjust(p, -1)" [attr.aria-disabled]="p.quantity <= 0"
@@ -181,6 +188,9 @@
                   </button>
                 </div>
               </div>
+            } @else {
+              <div class="card-ro"><span>Quantidade</span> <b class="num">{{ p.quantity | number }}</b></div>
+            }
             </li>
           }
         </ul>
@@ -192,7 +202,9 @@
     }
   }
 
-  <a class="fab" routerLink="/products/new" aria-label="Novo produto" id="fab-new-product">
+  @if (canWrite()) {
+    <a class="fab" routerLink="/products/new" aria-label="Novo produto" id="fab-new-product">
     <mat-icon aria-hidden="true">add</mat-icon>
   </a>
+  }
 </div>

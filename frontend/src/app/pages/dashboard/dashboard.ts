@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { MatIconModule } from '@angular/material/icon';
 import { ProductService } from '../../services/product.service';
+import { AuthService } from '../../core/auth.service';
 import { DashboardStats, Product } from '../../models/product.model';
 
 interface CategoryBar {
@@ -23,6 +24,7 @@ interface CategoryBar {
 })
 export class DashboardComponent {
   private productService = inject(ProductService);
+  readonly canWrite = inject(AuthService).canWrite;
 
   readonly state = signal<'loading' | 'error' | 'ready'>('loading');
   readonly stats = signal<DashboardStats | null>(null);

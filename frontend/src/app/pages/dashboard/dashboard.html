@@ -4,10 +4,12 @@
       <h1>Dashboard</h1>
       <p class="subtitle">Visão geral do estoque e itens que precisam de atenção</p>
     </div>
-    <a class="btn-primary" routerLink="/products/new" id="btn-add-product">
+    @if (canWrite()) {
+      <a class="btn-primary" routerLink="/products/new" id="btn-add-product">
       <mat-icon aria-hidden="true">add</mat-icon>
       <span>Novo produto</span>
     </a>
+    }
   </header>
 
   <div class="sr-only" role="status" aria-live="polite">{{ liveMessage() }}</div>
@@ -43,10 +45,12 @@
           <mat-icon aria-hidden="true">inventory_2</mat-icon>
           <h2>Seu estoque está vazio</h2>
           <p>Cadastre o primeiro produto para ver indicadores e alertas aqui.</p>
-          <a class="btn-primary" routerLink="/products/new">
+          @if (canWrite()) {
+            <a class="btn-primary" routerLink="/products/new">
             <mat-icon aria-hidden="true">add</mat-icon>
             <span>Cadastrar primeiro produto</span>
           </a>
+          }
         </div>
       } @else {
         <section class="kpis" aria-label="Indicadores">
@@ -103,10 +107,12 @@
                     <span class="chip" [class.chip--danger]="isOut(p)" [class.chip--warning]="!isOut(p)">
                       {{ isOut(p) ? 'Esgotado' : 'Baixo' }}
                     </span>
-                    <a class="btn-outline" [routerLink]="['/products', p.id, 'edit']" [attr.aria-label]="'Repor ' + p.name">
+                    @if (canWrite()) {
+                      <a class="btn-outline" [routerLink]="['/products', p.id, 'edit']" [attr.aria-label]="'Repor ' + p.name">
                       <mat-icon aria-hidden="true">add_shopping_cart</mat-icon>
                       <span>Repor</span>
                     </a>
+                    }
                   </li>
                 }
               </ul>
