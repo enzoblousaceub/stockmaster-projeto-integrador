@@ -1,6 +1,6 @@
-# 📦 Estoque Master — Sistema de Gestão de Estoque
+# 📦 Stock Master — Sistema de Gestão de Estoque
 
-Bem-vindo ao **Estoque Master** (StockManager), uma plataforma moderna para monitoramento, organização e controle de estoque desenvolvida em **.NET** e **Angular**.
+Bem-vindo ao **Stock Master** (StockManager), uma plataforma moderna para monitoramento, organização e controle de estoque desenvolvida em **.NET** e **Angular**.
 
 Este documento fornece o guia completo de configuração, execução e arquitetura do projeto.
 
@@ -129,4 +129,4 @@ O `render.yaml` cria o serviço web (Docker) e um Postgres ligado a ele via `DAT
 4. **HTTPS:** confirme que o login funciona (o proxy envia `X-Forwarded-Proto: https`).
 
 ---
-*Estoque Master — Gestão inteligente e simplificada de inventário.*
+*Stock Master — Gestão inteligente e simplificada de inventário.*

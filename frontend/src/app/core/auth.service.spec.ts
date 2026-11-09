@@ -80,6 +80,26 @@ describe('AuthService', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/login'], { queryParams: { returnUrl: '/products?q=a', expirada: 1 } });
   });
 
+  it.skipIf(typeof BroadcastChannel === 'undefined')('logout em outra aba derruba esta aba (BroadcastChannel)', async () => {
+    login();
+    vi.spyOn(router, 'url', 'get').mockReturnValue('/products');
+    const other = new BroadcastChannel('sm-auth'); // "outra aba"
+    other.postMessage('logout');
+    await new Promise((r) => setTimeout(r, 50));
+    other.close();
+    expect(auth.isLoggedIn()).toBe(false);
+    expect(router.navigate).toHaveBeenCalledWith(['/login']);
+  });
+
+  it.skipIf(typeof BroadcastChannel === 'undefined')('mensagens desconhecidas no canal são ignoradas', async () => {
+    login();
+    const other = new BroadcastChannel('sm-auth');
+    other.postMessage('qualquer-coisa');
+    await new Promise((r) => setTimeout(r, 50));
+    other.close();
+    expect(auth.isLoggedIn()).toBe(true);
+  });
+
   it('perfil desconhecido falha fechado (não é Admin)', () => {
     auth.user.set({ usuario: 'x', perfil: 'Outro' as never });
     expect(auth.canWrite()).toBe(false);

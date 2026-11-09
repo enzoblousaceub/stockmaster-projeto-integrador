@@ -32,6 +32,24 @@ export class AuthService {
 
   private loading?: Promise<void>;
 
+  /** Avisa as outras abas do mesmo navegador (só o sinal "logout"; nenhum dado de sessão trafega). */
+  private channel: BroadcastChannel | null = null;
+
+  constructor() {
+    if (typeof BroadcastChannel !== 'undefined') {
+      this.channel = new BroadcastChannel('sm-auth');
+      this.channel.onmessage = (e) => { if (e.data === 'logout') this.remoteLogout(); };
+    }
+  }
+
+  /** Outra aba fez logout (em todos os dispositivos): esta aba também sai. */
+  private remoteLogout(): void {
+    if (!this.isLoggedIn()) return;
+    this.clear();
+    const url = this.router.url;
+    if (!url.startsWith('/login') && !url.startsWith('/ativar')) this.router.navigate(['/login']);
+  }
+
   /** Descobre a sessão uma única vez (boot do app / guardas). */
   ensureLoaded(): Promise<void> {
     if (this.ready()) return Promise.resolve();
@@ -83,7 +101,7 @@ export class AuthService {
     // 401 = a sessão já não existe: conta como sucesso. Outros erros sobem (a tela NÃO finge que saiu).
     return this.http.post<void>('/api/auth/logout', null, { context: new HttpContext().set(NO_401_REDIRECT, true) }).pipe(
       catchError((err) => (err instanceof HttpErrorResponse && err.status === 401 ? of(undefined) : throwError(() => err))),
-      tap(() => this.clear())
+      tap(() => { this.clear(); this.channel?.postMessage('logout'); })
     );
   }
 
