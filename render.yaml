@@ -1,10 +1,41 @@
+# Blueprint do Stock Master (Render).
+#
+# ATENCAO - banco GRATUITO (apenas para validar o projeto):
+#   * expira 30 dias apos a criacao (14 dias de carencia; depois o Render APAGA o banco e os dados);
+#   * nao tem backup; so 1 Postgres gratuito por workspace.
+#   Antes de usar dados reais, troque `plan: free` por um plano pago (tem backup/PITR).
+# Fonte: https://render.com/docs/free#free-postgres
+databases:
+  - name: stockmaster-db
+    plan: free
+    region: oregon
+    databaseName: stockmaster
+    user: stockmaster
+
 services:
   - type: web
     name: estoque-master
     runtime: docker
     plan: free
-    region: oregon
+    region: oregon          # mesma regiao do banco (URL interna)
+    healthCheckPath: /healthz
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
-
+      - key: Seed__Enabled   # dados de demonstracao desligados em producao
+        value: "false"
+      - key: DATABASE_URL    # URL interna do Render Postgres (postgresql://user:senha@host:5432/db)
+        fromDatabase:
+          name: stockmaster-db
+          property: connectionString
+      # --- Autenticacao: segredos preenchidos NO PAINEL do Render (sync: false = nunca vao para o repo) ---
+      - key: Auth__AdminUsuario   # primeiro Admin (3-32 chars [a-z0-9._-])
+        sync: false
+      - key: Auth__AdminSenha     # senha do primeiro Admin (so lida no bootstrap; pode ser removida depois)
+        sync: false
+      - key: Auth__CodeHmacKey    # base64 de >= 32 bytes: openssl rand -base64 32
+        sync: false
+      - key: Auth__KeyEncryptionKey   # base64 de >= 32 bytes: cifra as chaves de sessao guardadas no Postgres
+        sync: false
+      - key: RateLimit__LoginFailuresPerMinute   # TEMPORARIO ate validar o X-Forwarded-For do Render (ver README)
+        value: "20"

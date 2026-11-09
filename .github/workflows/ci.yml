@@ -1,0 +1,42 @@
+# CI: so build e testes (sem deploy). O deploy e feito pelo Render.
+name: CI
+
+on:
+  push:
+    branches: [ main, master, 'refactor/**' ]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest   # tem Docker: os testes usam PostgreSQL real via Testcontainers
+    timeout-minutes: 15  # rede de segurança: um build que não encerra não deve consumir o runner
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet build backend.Tests/backend.Tests.csproj --configuration Release
+      - run: dotnet test backend.Tests/backend.Tests.csproj --configuration Release --no-build
+      - name: Pacotes vulneraveis
+        run: dotnet list backend/backend.csproj package --vulnerable --include-transitive
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15  # rede de segurança: um build que não encerra não deve consumir o runner
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --legacy-peer-deps
+      - run: npm run build -- --configuration production
+      - run: npm test -- --watch=false
+      - run: npm audit --omit=dev

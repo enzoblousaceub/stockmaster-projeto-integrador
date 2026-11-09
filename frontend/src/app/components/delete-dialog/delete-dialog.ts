@@ -1,77 +1,60 @@
-import { Component, Inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatButtonModule } from '@angular/material/button';
+import { Component, inject } from '@angular/core';
+import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 
+/** Confirmação de exclusão. Foco inicial no "Cancelar" (ação segura); ESC cancela. */
 @Component({
   selector: 'app-delete-dialog',
   standalone: true,
-  imports: [CommonModule, MatDialogModule, MatButtonModule, MatIconModule],
+  imports: [MatDialogModule, MatIconModule],
   template: `
-    <div class="delete-dialog">
-      <div class="dialog-icon">
-        <mat-icon>warning</mat-icon>
-      </div>
-      <h2 mat-dialog-title>Excluir Produto</h2>
-      <mat-dialog-content>
-        <p>Tem certeza de que deseja excluir <strong>"{{ data.name }}"</strong>?</p>
-        <p class="warning-text">Esta ação não poderá ser desfeita.</p>
-      </mat-dialog-content>
-      <mat-dialog-actions align="end">
-        <button mat-stroked-button (click)="onCancel()" id="btn-dialog-cancel">Cancelar</button>
-        <button mat-raised-button color="warn" (click)="onConfirm()" id="btn-dialog-confirm">
-          <mat-icon>delete</mat-icon>
-          Excluir
-        </button>
-      </mat-dialog-actions>
+    <div class="head">
+      <span class="icon" aria-hidden="true"><mat-icon>delete_forever</mat-icon></span>
+      <h2 mat-dialog-title id="delete-title">Excluir produto?</h2>
     </div>
+    <mat-dialog-content>
+      <p id="delete-desc">
+        O produto <strong>{{ data.name }}</strong> será excluído permanentemente. Esta ação não pode ser desfeita.
+      </p>
+    </mat-dialog-content>
+    <mat-dialog-actions align="end">
+      <button type="button" class="btn btn-outline" [mat-dialog-close]="false" cdkFocusInitial id="btn-dialog-cancel">
+        Cancelar
+      </button>
+      <button type="button" class="btn btn-danger" [mat-dialog-close]="true" id="btn-dialog-confirm">
+        <mat-icon aria-hidden="true">delete</mat-icon>
+        <span>Excluir</span>
+      </button>
+    </mat-dialog-actions>
   `,
   styles: [`
-    .delete-dialog {
-      padding: 8px;
+    :host { display: block; color: var(--sm-text); }
+    .head { display: flex; align-items: center; gap: 12px; padding: 4px 24px 0; }
+    .head h2 { margin: 0; padding: 0; flex: 1; font-size: 1.125rem; font-weight: 600; }
+    .head h2::before { display: none; }
+    .icon {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 40px; height: 40px; border-radius: 50%;
+      background: var(--sm-danger-soft); color: var(--sm-danger);
     }
-    .dialog-icon {
-      display: flex;
-      justify-content: center;
-      margin-bottom: 8px;
-      mat-icon {
-        font-size: 48px;
-        width: 48px;
-        height: 48px;
-        color: #f87171;
-      }
+    p { margin: 8px 0 0; color: var(--sm-text-2); overflow-wrap: anywhere; }
+    p strong { color: var(--sm-text); }
+    mat-dialog-actions { gap: 8px; padding: 12px 24px 20px; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      min-height: 48px; padding: 0 20px; border-radius: var(--sm-radius);
+      font: inherit; font-weight: 600; cursor: pointer;
     }
-    h2 {
-      text-align: center;
-      margin: 0 0 8px 0;
-    }
-    mat-dialog-content p {
-      text-align: center;
-      margin: 4px 0;
-    }
-    .warning-text {
-      font-size: 0.85rem;
-      opacity: 0.6;
-    }
-    mat-dialog-actions button {
-      display: flex;
-      align-items: center;
-      gap: 6px;
+    .btn mat-icon { width: 20px; height: 20px; font-size: 20px; }
+    .btn-outline { border: 1px solid var(--sm-control-border); background: transparent; color: var(--sm-text); }
+    .btn-outline:hover { background: var(--sm-surface-2); }
+    .btn-danger { border: 1px solid var(--sm-danger); background: var(--sm-danger); color: var(--sm-on-danger); }
+    .btn-danger:hover { filter: brightness(1.1); }
+    @media (max-width: 480px) {
+      mat-dialog-actions { flex-direction: column-reverse; align-items: stretch; }
     }
   `]
 })
 export class DeleteDialogComponent {
-  constructor(
-    public dialogRef: MatDialogRef<DeleteDialogComponent>,
-    @Inject(MAT_DIALOG_DATA) public data: { name: string }
-  ) {}
-
-  onCancel(): void {
-    this.dialogRef.close(false);
-  }
-
-  onConfirm(): void {
-    this.dialogRef.close(true);
-  }
+  readonly data = inject<{ name: string }>(MAT_DIALOG_DATA);
 }

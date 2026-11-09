@@ -15,13 +15,13 @@ namespace backend.DTOs
         [MaxLength(100)]
         public string Category { get; set; } = string.Empty;
 
-        [Range(0, int.MaxValue)]
+        [Range(0, Limits.MaxValue)]
         public int Quantity { get; set; }
 
-        [Range(0, double.MaxValue)]
+        [Range(typeof(decimal), "0", "1000000", ParseLimitsInInvariantCulture = true, ConvertValueInInvariantCulture = true)]
         public decimal Price { get; set; }
 
-        [Range(0, int.MaxValue)]
+        [Range(0, Limits.MaxValue)]
         public int MinStock { get; set; }
     }
 }

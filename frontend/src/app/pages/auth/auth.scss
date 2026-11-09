@@ -1,0 +1,143 @@
+/* Telas públicas: login e ativação */
+.auth {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.auth-brand {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 48px;
+  color: #fff;
+  background: linear-gradient(160deg, #1d4ed8, #2563eb 55%, #3b82f6);
+
+  .brand { color: #fff; }
+  h2 { margin: 0 0 12px; font-size: 2rem; line-height: 1.2; color: #fff; letter-spacing: -0.02em; }
+  p { margin: 0; max-width: 34ch; opacity: 0.92; }
+  ul { list-style: none; padding: 0; margin: 24px 0 0; display: grid; gap: 10px; }
+  li { display: flex; gap: 10px; align-items: center; }
+}
+
+.auth-form {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px;
+  background: var(--sm-bg);
+  outline: none;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+
+  h1 { margin: 0 0 6px; font-size: 1.625rem; }
+  .sub { margin: 0 0 24px; color: var(--sm-text-2); }
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 1.2rem;
+  letter-spacing: -0.02em;
+  color: var(--sm-text);
+
+  img { border-radius: 8px; }
+}
+
+.brand-mobile { display: none; margin-bottom: 28px; }
+
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.field label { font-size: 0.875rem; font-weight: 500; }
+
+.hint { color: var(--sm-text-2); font-size: 0.8125rem; }
+.center { text-align: center; margin: 16px 0 0; font-size: 0.875rem; }
+.field-error { color: var(--sm-danger); font-size: 0.8125rem; }
+.link { color: var(--sm-primary); font-weight: 600; &:hover { text-decoration: underline; } }
+.mono { font-family: var(--sm-font-mono) !important; letter-spacing: 0.05em; }
+
+.input {
+  position: relative;
+
+  input {
+    width: 100%;
+    height: 52px;
+    box-sizing: border-box;
+    padding: 0 14px;
+    border: 1px solid var(--sm-control-border);
+    border-radius: var(--sm-radius);
+    background: var(--sm-surface-2);
+    color: var(--sm-text);
+    font: inherit;
+
+    &:focus-visible { outline: 2px solid var(--sm-primary); outline-offset: 1px; background: var(--sm-surface); }
+    &[aria-invalid='true'] { border-color: var(--sm-danger); }
+  }
+
+  .lead { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--sm-text-2); pointer-events: none; }
+  &.has-lead input { padding-left: 44px; }
+  &.has-trail input { padding-right: 52px; }
+
+  .trail {
+    position: absolute;
+    right: 4px;
+    top: 4px;
+    width: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: var(--sm-radius);
+    background: transparent;
+    color: var(--sm-text-2);
+    cursor: pointer;
+
+    &:hover { background: var(--sm-surface); color: var(--sm-text); }
+  }
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: var(--sm-radius);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-primary { border: 1px solid var(--sm-primary); background: var(--sm-primary); color: var(--sm-on-primary); }
+.btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
+.btn-primary:disabled,
+.btn-primary[aria-disabled='true'] { opacity: 0.6; cursor: not-allowed; }
+.btn-block { width: 100%; }
+
+.alert, .notice {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  border-radius: var(--sm-radius);
+  font-size: 0.9375rem;
+
+  mat-icon { flex-shrink: 0; width: 20px; height: 20px; font-size: 20px; margin-top: 1px; }
+}
+.alert { background: var(--sm-danger-soft); color: var(--sm-danger); }
+.notice { background: var(--sm-primary-soft); color: var(--sm-primary); }
+.notice--ok { background: var(--sm-success-soft); color: var(--sm-success); }
+
+.wait { margin: -4px 0 16px; color: var(--sm-text-2); font-size: 0.875rem; }
+
+@media (max-width: 899.98px) {
+  .auth { grid-template-columns: 1fr; }
+  .auth-brand { display: none; }
+  .brand-mobile { display: flex; }
+  .auth-form { align-items: flex-start; padding-top: 56px; }
+}

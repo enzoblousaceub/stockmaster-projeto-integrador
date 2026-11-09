@@ -1,107 +1,106 @@
-<div class="form-container">
-  <div class="page-header">
-    <button mat-icon-button routerLink="/products" class="back-btn" id="btn-back">
-      <mat-icon>arrow_back</mat-icon>
-    </button>
-    <div class="header-text">
+<div class="page" [attr.aria-busy]="loading">
+  <header class="page-header">
+    <a class="back-btn" routerLink="/products" id="btn-back" aria-label="Voltar para a lista de produtos">
+      <mat-icon aria-hidden="true">arrow_back</mat-icon>
+    </a>
+    <div>
       <h1>{{ pageTitle }}</h1>
-      <p class="subtitle">{{ isEditMode ? 'Atualize as informações do item selecionado' : 'Adicione um novo item ao seu estoque' }}</p>
+      <p class="subtitle">{{ isEditMode ? 'Atualize as informações do item' : 'Adicione um novo item ao estoque' }}</p>
+    </div>
+  </header>
+
+  <div class="layout">
+    <form id="product-form" class="fields" [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+      <fieldset class="section" [disabled]="loading && isEditMode">
+        <legend>Identificação</legend>
+        <div class="grid">
+          <mat-form-field appearance="fill" subscriptSizing="dynamic">
+            <mat-label>Nome do produto</mat-label>
+            <input matInput formControlName="name" id="input-name" autocomplete="off" enterkeyhint="next" required>
+            @if (form.get('name')?.hasError('required')) { <mat-error>Informe o nome do produto</mat-error> }
+            @if (form.get('name')?.hasError('maxlength')) { <mat-error>Máximo de 200 caracteres</mat-error> }
+          </mat-form-field>
+
+          <mat-form-field appearance="fill" subscriptSizing="dynamic">
+            <mat-label>Categoria</mat-label>
+            <input matInput formControlName="category" id="input-category" list="category-options"
+              autocomplete="off" enterkeyhint="next" required>
+            <datalist id="category-options">
+              @for (c of categories; track c) { <option [value]="c"></option> }
+            </datalist>
+            @if (form.get('category')?.hasError('required')) { <mat-error>Informe a categoria</mat-error> }
+            @if (form.get('category')?.hasError('maxlength')) { <mat-error>Máximo de 100 caracteres</mat-error> }
+          </mat-form-field>
+
+          <mat-form-field appearance="fill" subscriptSizing="dynamic" class="span-2">
+            <mat-label>Descrição (opcional)</mat-label>
+            <textarea matInput formControlName="description" id="input-description" rows="3"></textarea>
+            @if (form.get('description')?.hasError('maxlength')) { <mat-error>Máximo de 500 caracteres</mat-error> }
+          </mat-form-field>
+        </div>
+      </fieldset>
+
+      <fieldset class="section" [disabled]="loading && isEditMode">
+        <legend>Preço e estoque</legend>
+        <div class="grid grid-3">
+          <mat-form-field appearance="fill" subscriptSizing="dynamic">
+            <mat-label>Preço (R$)</mat-label>
+            <input matInput type="number" inputmode="decimal" step="0.01" min="0" formControlName="price"
+              id="input-price" enterkeyhint="next" required>
+            @if (form.get('price')?.hasError('required')) { <mat-error>Informe o preço</mat-error> }
+            @if (form.get('price')?.hasError('min')) { <mat-error>O preço não pode ser negativo</mat-error> }
+            @if (form.get('price')?.hasError('max')) { <mat-error>Valor acima do permitido</mat-error> }
+            @if (form.get('price')?.hasError('decimals')) { <mat-error>Use no máximo 2 casas decimais</mat-error> }
+          </mat-form-field>
+
+          <mat-form-field appearance="fill" subscriptSizing="dynamic">
+            <mat-label>Quantidade</mat-label>
+            <input matInput type="number" inputmode="numeric" step="1" min="0" formControlName="quantity"
+              id="input-quantity" enterkeyhint="next" required>
+            @if (form.get('quantity')?.hasError('required')) { <mat-error>Informe a quantidade</mat-error> }
+            @if (form.get('quantity')?.hasError('min')) { <mat-error>A quantidade não pode ser negativa</mat-error> }
+            @if (form.get('quantity')?.hasError('max')) { <mat-error>Valor acima do permitido</mat-error> }
+          </mat-form-field>
+
+          <mat-form-field appearance="fill" subscriptSizing="dynamic">
+            <mat-label>Estoque mínimo</mat-label>
+            <input matInput type="number" inputmode="numeric" step="1" min="0" formControlName="minStock"
+              id="input-min-stock" enterkeyhint="done" required>
+            <mat-hint>Avisa quando a quantidade chegar a este nível</mat-hint>
+            @if (form.get('minStock')?.hasError('required')) { <mat-error>Informe o estoque mínimo</mat-error> }
+            @if (form.get('minStock')?.hasError('min')) { <mat-error>O mínimo não pode ser negativo</mat-error> }
+            @if (form.get('minStock')?.hasError('max')) { <mat-error>Valor acima do permitido</mat-error> }
+          </mat-form-field>
+        </div>
+      </fieldset>
+    </form>
+
+    <aside class="preview" [class.collapsed]="!previewOpen" aria-label="Pré-visualização do produto">
+      <button type="button" class="preview-toggle" (click)="previewOpen = !previewOpen"
+        [attr.aria-expanded]="previewOpen" aria-controls="preview-card" id="btn-preview">
+        <span>Pré-visualização</span>
+        <mat-icon aria-hidden="true">{{ previewOpen ? 'expand_less' : 'expand_more' }}</mat-icon>
+      </button>
+      <h2 class="preview-title">Pré-visualização</h2>
+      <div class="preview-card" id="preview-card">
+        <div class="image-wrapper">
+          <img [src]="isEditMode && productId ? 'images/' + productId + '.png' : 'images/placeholder.png'"
+            (error)="onImgError($event)" class="preview-image" alt="" />
+        </div>
+        <div class="preview-info">
+          <span class="preview-name">{{ form.get('name')?.value || 'Nome do produto' }}</span>
+          <span class="preview-category">{{ form.get('category')?.value || 'Categoria' }}</span>
+          <span class="preview-price num">{{ (form.get('price')?.value || 0) | currency: 'BRL' : 'symbol' : '1.2-2' }}</span>
+        </div>
+      </div>
+    </aside>
+
+    <div class="actions" role="group" aria-label="Ações do formulário">
+      <a class="btn btn-outline" routerLink="/products" id="btn-cancel">Cancelar</a>
+      <button class="btn btn-primary" type="submit" form="product-form" [disabled]="loading" id="btn-submit">
+        <mat-icon aria-hidden="true">{{ isEditMode ? 'save' : 'check' }}</mat-icon>
+        <span>{{ isEditMode ? 'Salvar alterações' : 'Cadastrar produto' }}</span>
+      </button>
     </div>
   </div>
-
-  <mat-card class="form-card">
-    <mat-card-content>
-      <div class="form-layout-grid">
-        <!-- Preview Panel -->
-        <div class="product-preview-panel">
-          <div class="preview-title">Visualização do Produto</div>
-          <div class="preview-card">
-            <div class="image-wrapper">
-              <img [src]="isEditMode && productId ? 'images/' + productId + '.png' : 'images/placeholder.png'" 
-                   onerror="this.src='images/placeholder.png'" 
-                   class="preview-image" 
-                   alt="Preview do Produto" />
-            </div>
-            <div class="preview-info">
-              <span class="preview-name">{{ form.get('name')?.value || 'Nome do Produto' }}</span>
-              <span class="preview-category">{{ form.get('category')?.value || 'Categoria' }}</span>
-              <span class="preview-price">{{ (form.get('price')?.value || 0) | currency:'BRL':'symbol':'1.2-2' }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Form Panel -->
-        <form [formGroup]="form" (ngSubmit)="onSubmit()" class="product-form">
-
-          <div class="form-row">
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-label>Nome do Produto</mat-label>
-              <input matInput formControlName="name" placeholder="Ex: Mouse Sem Fio" id="input-name">
-              <mat-icon matPrefix>inventory_2</mat-icon>
-              <mat-error *ngIf="form.get('name')?.hasError('required')">Nome é obrigatório</mat-error>
-              <mat-error *ngIf="form.get('name')?.hasError('maxlength')">Máximo de 200 caracteres</mat-error>
-            </mat-form-field>
-          </div>
-
-          <div class="form-row">
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-label>Descrição</mat-label>
-              <textarea matInput formControlName="description" placeholder="Descreva brevemente o produto (opcional)..." rows="3" id="input-description"></textarea>
-              <mat-icon matPrefix>description</mat-icon>
-              <mat-error *ngIf="form.get('description')?.hasError('maxlength')">Máximo de 500 caracteres</mat-error>
-            </mat-form-field>
-          </div>
-
-          <div class="form-row">
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-label>Categoria</mat-label>
-              <input matInput formControlName="category" placeholder="Ex: Eletrônicos, Escritório, Acessórios" id="input-category">
-              <mat-icon matPrefix>category</mat-icon>
-              <mat-error *ngIf="form.get('category')?.hasError('required')">Categoria é obrigatória</mat-error>
-            </mat-form-field>
-          </div>
-
-          <div class="form-row two-col">
-            <mat-form-field appearance="outline">
-              <mat-label>Quantidade</mat-label>
-              <input matInput type="number" formControlName="quantity" placeholder="0" id="input-quantity">
-              <mat-icon matPrefix>widgets</mat-icon>
-              <mat-error *ngIf="form.get('quantity')?.hasError('required')">Obrigatório</mat-error>
-              <mat-error *ngIf="form.get('quantity')?.hasError('min')">Deve ser >= 0</mat-error>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline">
-              <mat-label>Preço (R$)</mat-label>
-              <input matInput type="number" formControlName="price" placeholder="0,00" step="0.01" id="input-price">
-              <mat-icon matPrefix>attach_money</mat-icon>
-              <mat-error *ngIf="form.get('price')?.hasError('required')">Obrigatório</mat-error>
-              <mat-error *ngIf="form.get('price')?.hasError('min')">Deve ser >= 0</mat-error>
-            </mat-form-field>
-          </div>
-
-          <div class="form-row">
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-label>Nível de Estoque Mínimo</mat-label>
-              <input matInput type="number" formControlName="minStock" placeholder="0" id="input-min-stock">
-              <mat-icon matPrefix>warning</mat-icon>
-              <mat-hint>Avisar quando a quantidade em estoque cair abaixo deste nível</mat-hint>
-              <mat-error *ngIf="form.get('minStock')?.hasError('required')">Obrigatório</mat-error>
-              <mat-error *ngIf="form.get('minStock')?.hasError('min')">Deve ser >= 0</mat-error>
-            </mat-form-field>
-          </div>
-
-          <div class="form-actions">
-            <button mat-stroked-button type="button" routerLink="/products" id="btn-cancel">
-              Cancelar
-            </button>
-            <button mat-raised-button color="primary" type="submit" [disabled]="loading" id="btn-submit">
-              <mat-icon>{{ isEditMode ? 'save' : 'add' }}</mat-icon>
-              {{ isEditMode ? 'Salvar Alterações' : 'Cadastrar Produto' }}
-            </button>
-          </div>
-
-        </form>
-      </div>
-    </mat-card-content>
-  </mat-card>
 </div>

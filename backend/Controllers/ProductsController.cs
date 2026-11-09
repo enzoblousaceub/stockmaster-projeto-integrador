@@ -1,6 +1,9 @@
 using backend.Data;
 using backend.DTOs;
 using backend.Models;
+using System.ComponentModel.DataAnnotations;
+using backend.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,24 +22,29 @@ namespace backend.Controllers
 
         // GET: api/products
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Product>>> GetProducts([FromQuery] string? search, [FromQuery] string? category)
+        public async Task<ActionResult<IEnumerable<Product>>> GetProducts([FromQuery, MaxLength(Limits.MaxQueryLength)] string? search, [FromQuery, MaxLength(Limits.MaxQueryLength)] string? category)
         {
             var query = _context.Products.AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(search))
             {
+                var pattern = $"%{EscapeLike(search.Trim())}%";
                 query = query.Where(p =>
-                    p.Name.ToLower().Contains(search.ToLower()) ||
-                    (p.Description != null && p.Description.ToLower().Contains(search.ToLower())));
+                    EF.Functions.ILike(p.Name, pattern, "\\") ||
+                    (p.Description != null && EF.Functions.ILike(p.Description, pattern, "\\")));
             }
 
             if (!string.IsNullOrWhiteSpace(category))
             {
-                query = query.Where(p => p.Category.ToLower() == category.ToLower());
+                query = query.Where(p => EF.Functions.ILike(p.Category, EscapeLike(category.Trim()), "\\"));
             }
 
             return await query.OrderByDescending(p => p.UpdatedAt).ToListAsync();
         }
+
+        // Escapa curingas do LIKE (% _ \) para que a busca seja literal
+        private static string EscapeLike(string value) =>
+            value.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
 
         // GET: api/products/stats
         [HttpGet("stats")]
@@ -44,7 +52,7 @@ namespace backend.Controllers
         {
             var products = await _context.Products.ToListAsync();
             var totalProducts = products.Count;
-            var totalItems = products.Sum(p => p.Quantity);
+            var totalItems = products.Sum(p => (long)p.Quantity);
             var totalValue = products.Sum(p => p.Quantity * p.Price);
             var lowStockCount = products.Count(p => p.Quantity > 0 && p.Quantity <= p.MinStock);
             var outOfStockCount = products.Count(p => p.Quantity == 0);
@@ -82,13 +90,14 @@ namespace backend.Controllers
 
             if (product == null)
             {
-                return NotFound(new { message = $"Product with ID {id} not found." });
+                return Problem(statusCode: StatusCodes.Status404NotFound, title: "Product not found", detail: $"Product with ID {id} not found.");
             }
 
             return product;
         }
 
         // POST: api/products
+        [Authorize(Policy = AuthSetup.AdminPolicy)]
         [HttpPost]
         public async Task<ActionResult<Product>> CreateProduct(CreateProductDto dto)
         {
@@ -111,6 +120,7 @@ namespace backend.Controllers
         }
 
         // PUT: api/products/5
+        [Authorize(Policy = AuthSetup.AdminPolicy)]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateProduct(int id, UpdateProductDto dto)
         {
@@ -118,7 +128,7 @@ namespace backend.Controllers
 
             if (product == null)
             {
-                return NotFound(new { message = $"Product with ID {id} not found." });
+                return Problem(statusCode: StatusCodes.Status404NotFound, title: "Product not found", detail: $"Product with ID {id} not found.");
             }
 
             product.Name = dto.Name;
@@ -134,7 +144,46 @@ namespace backend.Controllers
             return Ok(product);
         }
 
+        // PATCH: api/products/5/quantity  {"delta": -1}
+        // Ajuste atomico no banco (Quantity = Quantity + delta), sem ler-modificar-gravar: seguro com cliques concorrentes.
+        [Authorize(Policy = AuthSetup.AdminPolicy)]
+        [HttpPatch("{id}/quantity")]
+        public async Task<ActionResult<Product>> AdjustQuantity(int id, AdjustQuantityDto dto, CancellationToken ct)
+        {
+            var delta = dto.Delta;
+            var now = DateTime.UtcNow;
+
+            var affected = await _context.Products
+                .Where(p => p.Id == id && p.Quantity + delta >= 0 && p.Quantity + delta <= Limits.MaxValue)
+                .ExecuteUpdateAsync(set => set
+                    .SetProperty(p => p.Quantity, p => p.Quantity + delta)
+                    .SetProperty(p => p.UpdatedAt, now), ct);
+
+            if (affected == 0)
+            {
+                var exists = await _context.Products.AnyAsync(p => p.Id == id, ct);
+                if (!exists)
+                {
+                    return Problem(statusCode: StatusCodes.Status404NotFound, title: "Product not found",
+                        detail: $"Product with ID {id} not found.");
+                }
+
+                return Problem(statusCode: StatusCodes.Status409Conflict, title: "Invalid stock quantity",
+                    detail: $"Quantity must stay between 0 and {Limits.MaxValue}.");
+            }
+
+            var product = await _context.Products.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id, ct);
+            if (product == null)
+            {
+                // removido entre o UPDATE e a leitura
+                return Problem(statusCode: StatusCodes.Status404NotFound, title: "Product not found",
+                    detail: $"Product with ID {id} not found.");
+            }
+            return Ok(product);
+        }
+
         // DELETE: api/products/5
+        [Authorize(Policy = AuthSetup.AdminPolicy)]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteProduct(int id)
         {
@@ -142,7 +191,7 @@ namespace backend.Controllers
 
             if (product == null)
             {
-                return NotFound(new { message = $"Product with ID {id} not found." });
+                return Problem(statusCode: StatusCodes.Status404NotFound, title: "Product not found", detail: $"Product with ID {id} not found.");
             }
 
             _context.Products.Remove(product);
