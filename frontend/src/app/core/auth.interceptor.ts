@@ -4,7 +4,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { catchError, switchMap, throwError } from 'rxjs';
 import { AuthService } from './auth.service';
 import { messageFor, parseProblem } from './api-error';
-import { CSRF_RETRIED, PUBLIC_AUTH } from './http-context';
+import { CSRF_RETRIED, NO_401_REDIRECT, PUBLIC_AUTH } from './http-context';
 
 /**
  * - 401 fora de login/ativar: sessão acabou -> /login.
@@ -20,7 +20,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
       const problem = parseProblem(err);
       const isPublic = req.context.get(PUBLIC_AUTH);
 
-      if (err.status === 401 && !isPublic) {
+      if (err.status === 401 && !isPublic && !req.context.get(NO_401_REDIRECT)) {
         injector.get(AuthService).sessionExpired();
         return throwError(() => err);
       }

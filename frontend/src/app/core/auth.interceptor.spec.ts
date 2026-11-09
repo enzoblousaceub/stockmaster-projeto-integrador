@@ -7,7 +7,7 @@ import { of } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { authInterceptor } from './auth.interceptor';
 import { AuthService } from './auth.service';
-import { PUBLIC_AUTH } from './http-context';
+import { NO_401_REDIRECT, PUBLIC_AUTH } from './http-context';
 
 describe('authInterceptor', () => {
   let http: HttpClient;
@@ -43,6 +43,18 @@ describe('authInterceptor', () => {
     http.post('/api/auth/login', {}, { context: new HttpContext().set(PUBLIC_AUTH, true) }).subscribe({ error: () => {} });
     ctrl.expectOne('/api/auth/login').flush({ code: 'invalid_credentials' }, { status: 401, statusText: 'Unauthorized' });
     expect(auth.sessionExpired).not.toHaveBeenCalled();
+  });
+
+  it('NO_401_REDIRECT (logout): 401 não expira a sessão, mas csrf_invalid ainda faz o retry', () => {
+    const ctx = new HttpContext().set(NO_401_REDIRECT, true);
+    http.post('/api/auth/logout', null, { context: ctx }).subscribe({ error: () => {} });
+    ctrl.expectOne('/api/auth/logout').flush({ code: 'unauthenticated' }, { status: 401, statusText: 'Unauthorized' });
+    expect(auth.sessionExpired).not.toHaveBeenCalled();
+
+    http.post('/api/auth/logout', null, { context: ctx }).subscribe();
+    ctrl.expectOne('/api/auth/logout').flush({ code: 'csrf_invalid' }, { status: 403, statusText: 'Forbidden' });
+    expect(auth.refresh).toHaveBeenCalledTimes(1);
+    ctrl.expectOne('/api/auth/logout').flush(null, { status: 204, statusText: 'No Content' });
   });
 
   it('403 forbidden avisa e NÃO desloga', () => {

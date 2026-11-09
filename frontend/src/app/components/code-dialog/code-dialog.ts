@@ -29,7 +29,7 @@ export interface CodeDialogData {
       </p>
       <div class="code-box">
         <span class="sr-only">Código de ativação, soletrado: {{ spelled }}.</span>
-        <code id="activation-code" class="num" tabindex="0" aria-hidden="false">{{ data.code }}</code>
+        <code id="activation-code" class="num" tabindex="0">{{ data.code }}</code>
         <button type="button" class="btn btn-outline" (click)="copy()" id="btn-copy">
           <mat-icon aria-hidden="true">{{ copied() ? 'check' : 'content_copy' }}</mat-icon>
           <span>{{ copied() ? 'Copiado' : 'Copiar' }}</span>

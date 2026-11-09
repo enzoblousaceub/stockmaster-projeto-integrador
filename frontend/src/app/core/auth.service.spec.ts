@@ -43,6 +43,16 @@ describe('AuthService', () => {
     expect(auth.isLoggedIn()).toBe(false);
   });
 
+  it('boot: 200 com formato inesperado (HTML de proxy) NÃO vira sessão', async () => {
+    const a = auth.ensureLoaded();
+    await Promise.resolve();
+    ctrl.expectOne('/api/auth/me').flush('<html>fallback</html>');
+    await a;
+    expect(auth.isLoggedIn()).toBe(false);
+    expect(auth.bootError()).toBe(true);
+    expect(auth.ready()).toBe(false);
+  });
+
   it('logout: 401 conta como sucesso e limpa o estado', () => {
     login();
     let done = false;

@@ -3,9 +3,15 @@ import { HttpClient, HttpContext, HttpErrorResponse } from '@angular/common/http
 import { Router } from '@angular/router';
 import { Observable, catchError, firstValueFrom, of, tap, throwError } from 'rxjs';
 import { Me } from '../models/auth.model';
-import { PUBLIC_AUTH } from './http-context';
+import { NO_401_REDIRECT, PUBLIC_AUTH } from './http-context';
 
 const PUBLIC = () => new HttpContext().set(PUBLIC_AUTH, true);
+
+/** Resposta de /me só vale com o formato do contrato (um HTML 200 de proxy/fallback não é sessão). */
+function isMe(v: unknown): v is Me {
+  const m = v as Partial<Me> | null;
+  return !!m && typeof m.usuario === 'string' && (m.perfil === 'Admin' || m.perfil === 'Visualizador');
+}
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -34,7 +40,9 @@ export class AuthService {
 
   private async fetchMe(): Promise<void> {
     try {
-      this.user.set(await firstValueFrom(this.http.get<Me>('/api/auth/me', { context: PUBLIC() })));
+      const me = await firstValueFrom(this.http.get<Me>('/api/auth/me', { context: PUBLIC() }));
+      if (!isMe(me)) throw new Error('Resposta inesperada de /api/auth/me');
+      this.user.set(me);
       this.bootError.set(false);
       this.ready.set(true);
     } catch (e) {
@@ -73,7 +81,7 @@ export class AuthService {
   /** Encerra a sessão em TODOS os dispositivos (decisão do produto). */
   logout(): Observable<void> {
     // 401 = a sessão já não existe: conta como sucesso. Outros erros sobem (a tela NÃO finge que saiu).
-    return this.http.post<void>('/api/auth/logout', null, { context: PUBLIC() }).pipe(
+    return this.http.post<void>('/api/auth/logout', null, { context: new HttpContext().set(NO_401_REDIRECT, true) }).pipe(
       catchError((err) => (err instanceof HttpErrorResponse && err.status === 401 ? of(undefined) : throwError(() => err))),
       tap(() => this.clear())
     );
