@@ -20,11 +20,12 @@ namespace backend.Controllers
         private readonly IpFailureLimiter _ipLimiter;
         private readonly AuthThrottleService _throttle;
         private readonly AuditService _audit;
+        private readonly BlockedAuditGate _gate;
 
         public AuthController(AppDbContext db, Pbkdf2PasswordHasher hasher, ActivationCodes codes,
-            IpFailureLimiter ipLimiter, AuthThrottleService throttle, AuditService audit)
+            IpFailureLimiter ipLimiter, AuthThrottleService throttle, AuditService audit, BlockedAuditGate gate)
         {
-            _db = db; _hasher = hasher; _codes = codes; _ipLimiter = ipLimiter; _throttle = throttle; _audit = audit;
+            _db = db; _hasher = hasher; _codes = codes; _ipLimiter = ipLimiter; _throttle = throttle; _audit = audit; _gate = gate;
         }
 
         [AllowAnonymous]
@@ -36,16 +37,16 @@ namespace backend.Controllers
             if (_ipLimiter.BlockedSeconds(ClientIp) is int ipWait) return RateLimited(ipWait);
             if (await _throttle.LockedSecondsAsync(AuthThrottleService.Login, usuario, ct) is int wait)
             {
-                await _audit.LogAsync("login_bloqueado", "falha", null, usuario);
+                if (_gate.ShouldLog($"login:{usuario}")) await _audit.LogAsync("login_bloqueado", "falha", null, usuario);
                 return Locked(wait);
             }
 
             var user = await _db.Users.FirstOrDefaultAsync(u => u.Usuario == usuario, ct);
             var ok = false;
             if (user is { IsActive: true, PasswordHash: not null })
-                ok = _hasher.Verify(user.PasswordHash, dto.Senha);
+                ok = await _hasher.VerifyAsync(user.PasswordHash, dto.Senha);
             else
-                _hasher.VerifyDummy(dto.Senha);   // mesmo custo de tempo: nao revela se o usuario existe
+                await _hasher.VerifyDummyAsync(dto.Senha);   // mesmo custo de tempo: nao revela se o usuario existe
 
             if (!ok || user is null)
             {
@@ -56,7 +57,7 @@ namespace backend.Controllers
             }
 
             await _throttle.ResetAsync(AuthThrottleService.Login, usuario, ct);
-            if (_hasher.NeedsRehash(user.PasswordHash!)) user.PasswordHash = _hasher.Hash(dto.Senha);
+            if (_hasher.NeedsRehash(user.PasswordHash!)) user.PasswordHash = await _hasher.HashAsync(dto.Senha);
             user.LastLoginAt = DateTime.UtcNow;
             await _db.SaveChangesAsync(ct);
 
@@ -102,7 +103,7 @@ namespace backend.Controllers
             var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
             if (user?.PasswordHash is null) return Fail(401, "unauthenticated", "Nao autenticado");
 
-            if (!_hasher.Verify(user.PasswordHash, dto.SenhaAtual))
+            if (!await _hasher.VerifyAsync(user.PasswordHash, dto.SenhaAtual))
             {
                 await _throttle.RegisterFailureAsync(AuthThrottleService.Login, usuario, ct);
                 _ipLimiter.RecordFailure(ClientIp);
@@ -113,7 +114,7 @@ namespace backend.Controllers
 
             if (PasswordPolicy.Validate(dto.NovaSenha, usuario) is string policy) return PasswordError(policy);
 
-            user.PasswordHash = _hasher.Hash(dto.NovaSenha);
+            user.PasswordHash = await _hasher.HashAsync(dto.NovaSenha);
             user.SecurityStamp = Guid.NewGuid().ToString("N");   // derruba as outras sessoes
             user.UpdatedAt = DateTime.UtcNow;
             user.UpdatedBy = usuario;
@@ -150,7 +151,7 @@ namespace backend.Controllers
             if (_ipLimiter.BlockedSeconds(ClientIp) is int ipWait) return RateLimited(ipWait);
             if (await _throttle.LockedSecondsAsync(AuthThrottleService.Activate, usuario, ct) is int wait)
             {
-                await _audit.LogAsync("ativacao_bloqueada", "falha", null, usuario);
+                if (_gate.ShouldLog($"ativar:{usuario}")) await _audit.LogAsync("ativacao_bloqueada", "falha", null, usuario);
                 return Locked(wait);
             }
 
@@ -175,7 +176,7 @@ namespace backend.Controllers
             if (PasswordPolicy.Validate(dto.NovaSenha, usuario) is string policy) return PasswordError(policy);
 
             // 5) consome (atomico: so um request vence)
-            var hash = _hasher.Hash(dto.NovaSenha);
+            var hash = await _hasher.HashAsync(dto.NovaSenha);
             var now = DateTime.UtcNow;
             var stamp = Guid.NewGuid().ToString("N");
             var affected = await _db.Users

@@ -28,3 +28,14 @@ services:
         fromDatabase:
           name: stockmaster-db
           property: connectionString
+      # --- Autenticacao: segredos preenchidos NO PAINEL do Render (sync: false = nunca vao para o repo) ---
+      - key: Auth__AdminUsuario   # primeiro Admin (3-32 chars [a-z0-9._-])
+        sync: false
+      - key: Auth__AdminSenha     # senha do primeiro Admin (so lida no bootstrap; pode ser removida depois)
+        sync: false
+      - key: Auth__CodeHmacKey    # base64 de >= 32 bytes: openssl rand -base64 32
+        sync: false
+      - key: Auth__KeyEncryptionKey   # base64 de >= 32 bytes: cifra as chaves de sessao guardadas no Postgres
+        sync: false
+      - key: RateLimit__LoginFailuresPerMinute   # TEMPORARIO ate validar o X-Forwarded-For do Render (ver README)
+        value: "20"

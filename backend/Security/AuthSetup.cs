@@ -85,7 +85,14 @@ namespace backend.Security
                 o.AddPolicy(AdminPolicy, p => p.RequireAuthenticatedUser().RequireRole(Roles.Admin));
             });
 
+            // chaves do Data Protection cifradas com Auth__KeyEncryptionKey (quem le o banco nao forja cookies)
+            var kek = EnvKeyXmlEncryptor.ParseKey(config["Auth:KeyEncryptionKey"]);
+            if (kek is not null)
+                services.Configure<Microsoft.AspNetCore.DataProtection.KeyManagement.KeyManagementOptions>(o => o.XmlEncryptor = new EnvKeyXmlEncryptor(kek));
+
             services.AddHttpContextAccessor();
+            services.AddExceptionHandler<HasherBusyHandler>();
+            services.AddSingleton<BlockedAuditGate>();
             services.AddSingleton<Pbkdf2PasswordHasher>();
             services.AddSingleton<ActivationCodes>();
             services.AddSingleton<IpFailureLimiter>();
@@ -98,6 +105,9 @@ namespace backend.Security
         /// <summary>Valida a sessao no banco a cada request: usuario ativo, mesmo SecurityStamp e dentro do teto de 24h.</summary>
         private static async Task ValidateSessionAsync(CookieValidatePrincipalContext ctx)
         {
+            // arquivos estaticos/healthz nao precisam de sessao: evita uma consulta ao banco por asset
+            if (!ctx.HttpContext.Request.Path.StartsWithSegments("/api")) return;
+
             var principal = ctx.Principal;
             var idText = principal?.FindFirstValue(ClaimTypes.NameIdentifier);
             var stamp = principal?.FindFirstValue(StampClaim);
@@ -161,6 +171,33 @@ namespace backend.Security
         /// CSRF em duas camadas para TODO POST/PUT/PATCH/DELETE em /api: (a) Origin/Sec-Fetch-Site; (b) token do antiforgery
         /// (header X-XSRF-TOKEN) para requests autenticados, exceto login/ativar. Falha = 403 csrf_invalid.
         /// </summary>
+        /// <summary>
+        /// Cookies Secure exigem HTTPS. Atras do proxy o esquema vem do X-Forwarded-Proto; se faltar, falha com mensagem
+        /// clara (400 https_required + log Error) em vez de um 500 obscuro.
+        /// </summary>
+        public static IApplicationBuilder UseHttpsRequiredForSecureCookies(this IApplicationBuilder app, IConfiguration config)
+        {
+            var secure = SecureCookies(config);
+            var lastLog = DateTime.MinValue;
+            return app.Use(async (ctx, next) =>
+            {
+                if (secure && !ctx.Request.IsHttps && ctx.Request.Path.StartsWithSegments("/api"))
+                {
+                    if (DateTime.UtcNow - lastLog > TimeSpan.FromMinutes(1))
+                    {
+                        lastLog = DateTime.UtcNow;
+                        ctx.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("Auth").LogError(
+                            "Auth:SecureCookies=true mas a requisicao chegou por HTTP. Em producao o proxy deve enviar X-Forwarded-Proto: https; " +
+                            "para rodar em http://localhost defina Auth__SecureCookies=false.");
+                    }
+                    await ProblemWriter.WriteAsync(ctx, 400, "https_required", "HTTPS necessario",
+                        "Esta instalacao exige HTTPS para a autenticacao.");
+                    return;
+                }
+                await next();
+            });
+        }
+
         public static IApplicationBuilder UseCsrfProtection(this IApplicationBuilder app) => app.Use(async (ctx, next) =>
         {
             var m = ctx.Request.Method;

@@ -41,6 +41,11 @@ dotnet run
 > O backend roda em **http://localhost:8080**. Em desenvolvimento (`dotnet run`) os dados de demonstração são criados na primeira execução (`Seed:Enabled=true` em `appsettings.Development.json`). Em produção o seed fica **desligado** (`Seed__Enabled=false`).
 > Testes: `dotnet test backend.Tests` (sobe um PostgreSQL real via Testcontainers; exige o Docker em execução).
 
+#### Autenticação (login por usuário)
+Toda a API exige login (exceto `POST /api/auth/login`, `POST /api/auth/ativar` e `/healthz`). O primeiro **Admin** é criado na inicialização a partir de `Auth__AdminUsuario` e `Auth__AdminSenha` (no `.env.example` há valores **apenas de exemplo para desenvolvimento**; nunca há senha padrão no código). Sem essas variáveis o app sobe **sem Admin** e registra um erro no log. O Admin cadastra as pessoas (`/api/users`), recebe um **código de ativação de uso único (48 h)** e o repassa; a pessoa define a própria senha em `/api/auth/ativar`. O contrato completo está na nota `contrato-auth` do projeto.
+
+Variáveis (produção): `Auth__AdminUsuario`, `Auth__AdminSenha`, `Auth__CodeHmacKey` e `Auth__KeyEncryptionKey` (as duas últimas: base64 de pelo menos 32 bytes, ex.: `openssl rand -base64 32`; **troque `Auth__AdminSenha` do exemplo**). Girar `Auth__CodeHmacKey` invalida códigos de ativação pendentes. Em `http://localhost` sem HTTPS use `Auth__SecureCookies=false` (em `Development` já vem assim); em produção o proxy precisa enviar `X-Forwarded-Proto: https`, senão a API responde `400 https_required` e registra um erro no log.
+
 ### 3. Configurar e Executar o Frontend
 O frontend utiliza **Angular 21** com **Angular Material** e modo **Zoneless**.
 ```bash
@@ -116,6 +121,12 @@ O `render.yaml` cria o serviço web (Docker) e um Postgres ligado a ele via `DAT
 
 > [!WARNING]
 > O Postgres do `render.yaml` está no plano **gratuito**, apenas para validação: **expira 30 dias após a criação** (14 dias de carência, depois o Render apaga o banco e os dados) e **não tem backup**. **Antes de usar dados reais, troque `plan: free` por um plano pago.**
+
+### Primeiro acesso e checagens pós-deploy
+1. No painel do Render, preencha os segredos `Auth__AdminUsuario`, `Auth__AdminSenha`, `Auth__CodeHmacKey` e `Auth__KeyEncryptionKey` (declarados no `render.yaml` com `sync: false`). Faça o primeiro login com o Admin e crie as demais pessoas.
+2. **IP de origem (X-Forwarded-For):** o limite de falhas por IP (`RateLimit__LoginFailuresPerMinute`, 20 por ora) e a auditoria dependem de o IP real chegar à aplicação. Logue `RemoteIpAddress` de dois clientes diferentes; se vierem iguais (IP da borda), mantenha o limite alto ou ajuste o proxy.
+3. **Custo do hash:** meça ms por hash no plano free (PBKDF2 210k iterações); a concorrência é limitada por `Auth__HashConcurrency` (padrão 3) e, saturado, a API responde `503 server_busy`.
+4. **HTTPS:** confirme que o login funciona (o proxy envia `X-Forwarded-Proto: https`).
 
 ---
 *Estoque Master — Gestão inteligente e simplificada de inventário.*

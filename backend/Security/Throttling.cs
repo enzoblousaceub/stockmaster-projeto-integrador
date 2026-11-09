@@ -54,14 +54,14 @@ ON CONFLICT (""Kind"", ""Key"") DO UPDATE SET
             _db.AuthThrottles.Where(t => t.Key == key).ExecuteDeleteAsync(ct);
     }
 
-    /// <summary>Limite por IP que conta so FALHAS (login/ativacao/troca de senha): padrao 5 por minuto. Em memoria, por instancia.</summary>
+    /// <summary>Limite por IP que conta so FALHAS (login/ativacao/troca de senha): padrao 20 por minuto (ate validar o X-Forwarded-For do Render). Em memoria, por instancia.</summary>
     public class IpFailureLimiter
     {
         private readonly ConcurrentDictionary<string, Queue<DateTime>> _failures = new();
         private readonly int _limit;
         private static readonly TimeSpan Window = TimeSpan.FromMinutes(1);
 
-        public IpFailureLimiter(IConfiguration config) => _limit = config.GetValue("RateLimit:LoginFailuresPerMinute", 5);
+        public IpFailureLimiter(IConfiguration config) => _limit = config.GetValue("RateLimit:LoginFailuresPerMinute", 20);
 
         /// <summary>Segundos ate liberar, ou nulo se o IP pode tentar.</summary>
         public int? BlockedSeconds(string ip)
@@ -94,6 +94,23 @@ ON CONFLICT (""Kind"", ""Key"") DO UPDATE SET
             {
                 lock (q) { Trim(q); if (q.Count == 0) _failures.TryRemove(ip, out _); }
             }
+        }
+    }
+
+    /// <summary>Evita uma linha de auditoria por requisicao durante um bloqueio: no maximo 1 por chave por minuto.</summary>
+    public class BlockedAuditGate
+    {
+        private readonly ConcurrentDictionary<string, DateTime> _last = new();
+
+        public bool ShouldLog(string key)
+        {
+            var now = DateTime.UtcNow;
+            if (_last.Count > 10_000)
+                foreach (var (k, t) in _last) if (now - t > TimeSpan.FromMinutes(1)) _last.TryRemove(k, out _);
+            var allow = false;
+            _last.AddOrUpdate(key, _ => { allow = true; return now; },
+                (_, prev) => { if (now - prev >= TimeSpan.FromMinutes(1)) { allow = true; return now; } return prev; });
+            return allow;
         }
     }
 

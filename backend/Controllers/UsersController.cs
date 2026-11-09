@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using System.Data;
 
 namespace backend.Controllers
 {
@@ -29,8 +30,10 @@ namespace backend.Controllers
             var users = await _db.Users.AsNoTracking().OrderBy(u => u.Usuario).ToListAsync(ct);
             var now = DateTime.UtcNow;
             var locks = await _db.AuthThrottles.AsNoTracking()
-                .Where(t => t.Kind == AuthThrottleService.Login && t.LockedUntil > now)
-                .ToDictionaryAsync(t => t.Key, t => t.LockedUntil, ct);
+                .Where(t => t.LockedUntil > now)
+                .GroupBy(t => t.Key)
+                .Select(g => new { Key = g.Key, Until = g.Max(t => t.LockedUntil) })
+                .ToDictionaryAsync(x => x.Key, x => x.Until, ct);
             return Ok(users.Select(u => UserDto.From(u, locks.GetValueOrDefault(u.Usuario))));
         }
 
@@ -73,6 +76,8 @@ namespace backend.Controllers
                 return Fail(400, "validation_error", "Dados invalidos", "Informe perfil e/ou ativo.");
             if (dto.Perfil is not null && !Roles.IsValid(dto.Perfil)) return InvalidProfile();
 
+            // serializa as operacoes que podem remover um Admin ativo (evita dois Admins se removendo ao mesmo tempo)
+            await using var tx = await BeginAdminLockAsync(ct);
             var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
             if (user is null) return NotFoundUser(id);
 
@@ -110,6 +115,7 @@ namespace backend.Controllers
             user.UpdatedAt = DateTime.UtcNow;
             user.UpdatedBy = ActorName;
             await _db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
 
             if (roleChanged) await _audit.LogAsync("usuario_perfil_alterado", "ok", ActorName, user.Usuario, $"perfil {newRole}");
             if (activeChanged) await _audit.LogAsync(newActive ? "usuario_reativado" : "usuario_desativado", "ok", ActorName, user.Usuario);
@@ -119,6 +125,7 @@ namespace backend.Controllers
         [HttpPost("{id:int}/reset")]
         public async Task<IActionResult> Reset(int id, CancellationToken ct)
         {
+            await using var tx = await BeginAdminLockAsync(ct);
             var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
             if (user is null) return NotFoundUser(id);
             if (!user.IsActive)
@@ -133,6 +140,7 @@ namespace backend.Controllers
             user.UpdatedAt = DateTime.UtcNow;
             user.UpdatedBy = ActorName;
             await _db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
 
             await _audit.LogAsync("usuario_resetado", "ok", ActorName, user.Usuario);
             return Ok(new { codigoAtivacao = code, codigoExpiraEm = user.ActivationExpiresAt });
@@ -146,6 +154,13 @@ namespace backend.Controllers
             await _throttle.ResetAllAsync(user.Usuario, ct);
             await _audit.LogAsync("usuario_desbloqueado", "ok", ActorName, user.Usuario);
             return NoContent();
+        }
+
+        private async Task<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction> BeginAdminLockAsync(CancellationToken ct)
+        {
+            var tx = await _db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
+            await _db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(7001)", ct);
+            return tx;
         }
 
         private (string Code, string Normalized) NewCode()
@@ -166,8 +181,8 @@ namespace backend.Controllers
 
         private Task<DateTime?> LockedUntil(string usuario, CancellationToken ct) =>
             _db.AuthThrottles.AsNoTracking()
-                .Where(t => t.Kind == AuthThrottleService.Login && t.Key == usuario && t.LockedUntil > DateTime.UtcNow)
-                .Select(t => t.LockedUntil).FirstOrDefaultAsync(ct);
+                .Where(t => t.Key == usuario && t.LockedUntil > DateTime.UtcNow)
+                .Select(t => t.LockedUntil).OrderByDescending(x => x).FirstOrDefaultAsync(ct);
 
         private ObjectResult InvalidProfile() => Fail(400, "validation_error", "Dados invalidos",
             errors: new Dictionary<string, string> { ["perfil"] = $"Perfil deve ser exatamente \"{Roles.Admin}\" ou \"{Roles.Viewer}\"." });

@@ -129,6 +129,7 @@ app.UseForwardedHeaders();
 app.UseSecurityHeaders(BuildCsp(app.Environment), hsts: !app.Environment.IsDevelopment());
 if (corsOrigins.Length > 0) app.UseCors("Configured");
 app.UseRateLimiter();
+app.UseHttpsRequiredForSecureCookies(app.Configuration);
 app.UseAuthentication();
 app.UseCsrfProtection();
 app.UseAuthorization();

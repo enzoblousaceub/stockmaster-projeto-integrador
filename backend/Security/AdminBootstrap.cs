@@ -27,7 +27,7 @@ namespace backend.Security
             var senha = config["Auth:AdminSenha"];
             if (string.IsNullOrWhiteSpace(usuarioRaw) || string.IsNullOrEmpty(senha))
             {
-                log.LogWarning("Nenhum Admin ativo e Auth__AdminUsuario/Auth__AdminSenha nao definidos: nenhum Admin foi criado. Defina as variaveis e reinicie.");
+                log.LogError("Nenhum Admin ativo e Auth__AdminUsuario/Auth__AdminSenha nao definidos: nenhum Admin foi criado. Defina as variaveis e reinicie.");
                 return;
             }
             if (!UsuarioRules.IsValid(usuarioRaw))
@@ -54,7 +54,7 @@ namespace backend.Security
                 {
                     Usuario = usuario,
                     Role = Roles.Admin,
-                    PasswordHash = hasher.Hash(senha),
+                    PasswordHash = await hasher.HashAsync(senha),
                     CreatedBy = "bootstrap",
                     UpdatedBy = "bootstrap"
                 });
@@ -64,7 +64,7 @@ namespace backend.Security
             {
                 existing.Role = Roles.Admin;
                 existing.IsActive = true;
-                existing.PasswordHash = hasher.Hash(senha);
+                existing.PasswordHash = await hasher.HashAsync(senha);
                 existing.SecurityStamp = Guid.NewGuid().ToString("N");
                 existing.UpdatedAt = DateTime.UtcNow;
                 existing.UpdatedBy = "bootstrap";
