@@ -12,6 +12,7 @@ permissions:
 jobs:
   backend:
     runs-on: ubuntu-latest   # tem Docker: os testes usam PostgreSQL real via Testcontainers
+    timeout-minutes: 15  # rede de segurança: um build que não encerra não deve consumir o runner
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -24,6 +25,7 @@ jobs:
 
   frontend:
     runs-on: ubuntu-latest
+    timeout-minutes: 15  # rede de segurança: um build que não encerra não deve consumir o runner
     defaults:
       run:
         working-directory: frontend

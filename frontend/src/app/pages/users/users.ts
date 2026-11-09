@@ -9,7 +9,8 @@ import { ManagedUser } from '../../models/auth.model';
 import { UserService } from '../../services/user.service';
 import { ConfirmDialogComponent } from '../../components/confirm-dialog/confirm-dialog';
 import { CodeDialogComponent } from '../../components/code-dialog/code-dialog';
-import { CreateUserDialogComponent, EditProfileDialogComponent } from '../../components/user-dialogs/user-dialogs';
+import { CreateUserDialogComponent } from '../../components/user-dialogs/create-user-dialog';
+import { EditProfileDialogComponent } from '../../components/user-dialogs/edit-profile-dialog';
 
 @Component({
   selector: 'app-users',

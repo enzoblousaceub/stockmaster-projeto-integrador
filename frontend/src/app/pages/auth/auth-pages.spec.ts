@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LoginComponent } from './login';
 import { ActivateComponent } from './activate';
 import { UsersComponent } from '../users/users';
-import { CreateUserDialogComponent } from '../../components/user-dialogs/user-dialogs';
+import { CreateUserDialogComponent } from '../../components/user-dialogs/create-user-dialog';
 import { SettingsDialogComponent } from '../../components/settings-dialog/settings-dialog';
 import { CodeDialogComponent } from '../../components/code-dialog/code-dialog';
 import { AuthService } from '../../core/auth.service';
