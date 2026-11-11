@@ -67,12 +67,6 @@ export class ProductFormComponent implements OnInit {
     }
   }
 
-  /** Imagem ausente: troca pelo placeholder uma única vez (evita loop se ele faltar). */
-  onImgError(event: Event): void {
-    const img = event.target as HTMLImageElement;
-    if (!img.src.endsWith('images/placeholder.png')) img.src = 'images/placeholder.png';
-  }
-
   loadProduct(id: number): void {
     this.loading = true;
     this.productService.getProduct(id).subscribe({

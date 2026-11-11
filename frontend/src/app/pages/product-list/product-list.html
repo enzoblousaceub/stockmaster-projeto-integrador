@@ -121,7 +121,6 @@
                 <tr>
                   <td>
                     <div class="cell-product">
-                      <img [src]="'images/' + p.id + '.png'" (error)="onImgError($event)" alt="" width="40" height="40" loading="lazy">
                       <div class="cell-text">
                         <span class="p-name" [title]="p.name">{{ p.name }}</span>
                         <span class="p-code num">{{ code(p) }}</span>
@@ -154,7 +153,6 @@
           @for (p of pageItems(); track p.id) {
             <li class="card">
               <div class="card-top">
-                <img [src]="'images/' + p.id + '.png'" (error)="onImgError($event)" alt="" width="56" height="56" loading="lazy">
                 <div class="card-id">
                   <span class="p-name">{{ p.name }}</span>
                   <span class="card-meta"><span class="cat">{{ p.category }}</span> · <span class="num">{{ code(p) }}</span></span>

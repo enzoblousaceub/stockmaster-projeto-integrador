@@ -83,10 +83,6 @@
       </button>
       <h2 class="preview-title">Pré-visualização</h2>
       <div class="preview-card" id="preview-card">
-        <div class="image-wrapper">
-          <img [src]="isEditMode && productId ? 'images/' + productId + '.png' : 'images/placeholder.png'"
-            (error)="onImgError($event)" class="preview-image" alt="" />
-        </div>
         <div class="preview-info">
           <span class="preview-name">{{ form.get('name')?.value || 'Nome do produto' }}</span>
           <span class="preview-category">{{ form.get('category')?.value || 'Categoria' }}</span>
