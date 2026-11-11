@@ -188,11 +188,6 @@ export class ProductListComponent implements OnInit, OnDestroy {
     return '#' + String(p.id).padStart(4, '0');
   }
 
-  onImgError(event: Event): void {
-    const img = event.target as HTMLImageElement;
-    if (!img.src.endsWith('images/placeholder.png')) img.src = 'images/placeholder.png';
-  }
-
   // ---------- ajuste rápido de quantidade ----------
   // Otimista: a UI muda na hora; os cliques são acumulados e enviados como UM delta
   // (PATCH atômico no servidor). Em erro, só o delta enviado é revertido.

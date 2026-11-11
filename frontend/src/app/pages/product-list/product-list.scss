@@ -147,7 +147,6 @@ th[aria-sort='descending'] mat-icon { opacity: 1; }
 .num-col .th-btn { flex-direction: row; }
 
 .cell-product { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.cell-product img, .card-top img { border-radius: var(--sm-radius-sm); object-fit: cover; background: var(--sm-surface-2); flex-shrink: 0; }
 .cell-text { display: flex; flex-direction: column; min-width: 0; }
 
 .p-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
