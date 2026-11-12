@@ -31,18 +31,34 @@ public static class SharedPostgres
     }
 }
 
+/// <summary>E-mail falso: guarda o que seria enviado (nenhum teste chama a internet).</summary>
+public class FakeEmailSender : backend.Security.IEmailSender
+{
+    public record Sent(string To, string Subject, string Html, string Text);
+    public List<Sent> Messages { get; } = new();
+    public bool Succeed { get; set; } = true;
+
+    public Task<bool> SendAsync(string to, string subject, string html, string text, CancellationToken ct)
+    {
+        if (Succeed) lock (Messages) Messages.Add(new Sent(to, subject, html, text));
+        return Task.FromResult(Succeed);
+    }
+}
+
 /// <summary>
 /// Fabrica de testes de integracao contra PostgreSQL real. O provedor e escolhido em
 /// <see cref="ConfigureDatabase"/>; para outro banco basta herdar e sobrescrever.
 /// </summary>
 public class ApiFactory : WebApplicationFactory<Program>
 {
-    public const string AdminUser = "admin";
+    public const string AdminUser = "admin@exemplo.com";
     public const string AdminPassword = "Admin-Teste-123";
     public static readonly string CodeHmacKey = Convert.ToBase64String(new byte[32].Select((_, i) => (byte)(i + 7)).ToArray());
     protected virtual bool SecureCookies => false;
     protected virtual bool CreateAdmin => true;
     protected virtual string HmacKeySetting => CodeHmacKey;
+
+    public FakeEmailSender Email { get; } = new();
 
     private readonly string _connectionString = SharedPostgres.NewDatabaseAsync().GetAwaiter().GetResult();
 
@@ -53,9 +69,10 @@ public class ApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("Seed:Enabled", "true");
         builder.UseSetting("Auth:SecureCookies", SecureCookies ? "true" : "false");
         builder.UseSetting("Auth:CodeHmacKey", HmacKeySetting);
-        builder.UseSetting("Auth:AdminUsuario", CreateAdmin ? AdminUser : "");
+        builder.UseSetting("Auth:AdminEmail", CreateAdmin ? AdminUser : "");
         builder.UseSetting("Auth:AdminSenha", AdminPassword);
         builder.UseSetting("Auth:Pbkdf2Iterations", "1000");
+        builder.UseSetting("App:PublicBaseUrl", "https://estoque.test");
         // limites globais altos para nao interferir (os testes de rate limit definem os seus)
         builder.UseSetting("RateLimit:WritePerMinute", "100000");
         builder.UseSetting("RateLimit:ReadPerMinute", "100000");
@@ -68,6 +85,7 @@ public class ApiFactory : WebApplicationFactory<Program>
                 .ToList();
             foreach (var d in descriptors) services.Remove(d);
 
+            services.AddSingleton<backend.Security.IEmailSender>(Email);
             ConfigureDatabase(services, _connectionString);
         });
     }

@@ -39,7 +39,7 @@ import { ThemeMode, ThemeService } from '../../theme.service';
       @if (auth.user(); as me) {
         <section class="setting" aria-labelledby="sec-account">
           <h3 id="sec-account">Conta</h3>
-          <div class="kv"><span>Usuário</span><b>{{ me.usuario }}</b></div>
+          <div class="kv"><span>E-mail</span><b>{{ me.email }}</b></div>
           <div class="kv"><span>Perfil</span><span class="chip" [class.chip-admin]="me.perfil === 'Admin'">{{ me.perfil }}</span></div>
 
           <form class="pw" (submit)="$event.preventDefault(); changePassword()" novalidate>

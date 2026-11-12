@@ -130,8 +130,8 @@ ON CONFLICT (""Kind"", ""Key"") DO UPDATE SET
             {
                 Evento = evento,
                 Resultado = resultado,
-                AtorUsuario = Clean(ator, 32),
-                AlvoUsuario = Clean(alvo, 32),
+                AtorUsuario = Clean(ator, 254),
+                AlvoUsuario = Clean(alvo, 254),
                 Ip = _http.HttpContext?.Connection.RemoteIpAddress?.ToString(),
                 Detalhe = Clean(detalhe, 200)
             });

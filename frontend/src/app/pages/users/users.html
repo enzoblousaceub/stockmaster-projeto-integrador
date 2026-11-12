@@ -30,7 +30,7 @@
           <caption class="sr-only">Usuários do sistema</caption>
           <thead>
             <tr>
-              <th scope="col">Usuário</th><th scope="col">Perfil</th><th scope="col">Status</th><th scope="col">Último login</th>
+              <th scope="col">E-mail</th><th scope="col">Perfil</th><th scope="col">Status</th><th scope="col">Último login</th>
               <th scope="col" class="actions-col"><span class="sr-only">Ações</span></th>
             </tr>
           </thead>
@@ -40,7 +40,7 @@
                 <td>
                   <div class="who">
                     <span class="avatar" aria-hidden="true">{{ initials(u) }}</span>
-                    <div><b>{{ u.usuario }}</b><span>{{ isSelf(u) ? 'você' : (u.criadoPor ? 'criado por ' + u.criadoPor : '') }}</span></div>
+                    <div><b>{{ u.email }}</b><span>{{ isSelf(u) ? 'você' : (u.criadoPor ? 'criado por ' + u.criadoPor : '') }}</span></div>
                   </div>
                 </td>
                 <td><span class="chip" [class.chip-admin]="u.perfil === 'Admin'" [class.chip-view]="u.perfil !== 'Admin'">{{ u.perfil }}</span></td>
@@ -54,27 +54,27 @@
                 <td>{{ u.ultimoLoginEm ? (u.ultimoLoginEm | date: 'dd/MM/yyyy HH:mm') : 'nunca' }}</td>
                 <td class="actions-col">
                   @if (isLocked(u)) {
-                    <button type="button" class="btn btn-outline btn-sm" (click)="unlock(u)" [attr.aria-label]="'Desbloquear ' + u.usuario">
+                    <button type="button" class="btn btn-outline btn-sm" (click)="unlock(u)" [attr.aria-label]="'Desbloquear ' + u.email">
                       <mat-icon aria-hidden="true">lock_open</mat-icon><span>Desbloquear</span>
                     </button>
                   }
                   @if (u.status === 'Inativo') {
-                    <button type="button" class="btn btn-outline btn-sm" (click)="reactivate(u)" [attr.aria-label]="'Reativar ' + u.usuario">
+                    <button type="button" class="btn btn-outline btn-sm" (click)="reactivate(u)" [attr.aria-label]="'Reativar ' + u.email">
                       <mat-icon aria-hidden="true">undo</mat-icon><span>Reativar</span>
                     </button>
                   } @else {
-                    <button type="button" class="icon-act" (click)="editProfile(u)" [attr.aria-label]="'Alterar perfil de ' + u.usuario" title="Alterar perfil">
+                    <button type="button" class="icon-act" (click)="editProfile(u)" [attr.aria-label]="'Editar ' + u.email" title="Editar">
                       <mat-icon aria-hidden="true">badge</mat-icon>
                     </button>
                     <button type="button" class="icon-act" (click)="reset(u)"
-                      [attr.aria-label]="(u.status === 'Pendente' ? 'Gerar novo código para ' : 'Redefinir acesso de ') + u.usuario"
+                      [attr.aria-label]="(u.status === 'Pendente' ? 'Gerar novo código para ' : 'Redefinir acesso de ') + u.email"
                       [title]="u.status === 'Pendente' ? 'Gerar novo código' : 'Redefinir acesso'">
                       <mat-icon aria-hidden="true">key</mat-icon>
                     </button>
                     @if (isSelf(u)) {
                       <button type="button" class="icon-act" disabled aria-label="Você não pode desativar a si mesmo(a)"><mat-icon aria-hidden="true">block</mat-icon></button>
                     } @else {
-                      <button type="button" class="icon-act icon-act--danger" (click)="deactivate(u)" [attr.aria-label]="'Desativar ' + u.usuario" title="Desativar">
+                      <button type="button" class="icon-act icon-act--danger" (click)="deactivate(u)" [attr.aria-label]="'Desativar ' + u.email" title="Desativar">
                         <mat-icon aria-hidden="true">block</mat-icon>
                       </button>
                     }
@@ -93,7 +93,7 @@
             <div class="top">
               <span class="avatar" aria-hidden="true">{{ initials(u) }}</span>
               <div class="grow">
-                <b>{{ u.usuario }}</b>
+                <b>{{ u.email }}</b>
                 <div class="hint">{{ isSelf(u) ? 'você · ' : '' }}último login {{ u.ultimoLoginEm ? (u.ultimoLoginEm | date: 'dd/MM HH:mm') : 'nunca' }}</div>
               </div>
             </div>
@@ -105,18 +105,18 @@
             </div>
             <div class="acts">
               @if (isLocked(u)) {
-                <button type="button" class="btn btn-primary" (click)="unlock(u)" [attr.aria-label]="'Desbloquear ' + u.usuario"><mat-icon aria-hidden="true">lock_open</mat-icon>Desbloquear</button>
+                <button type="button" class="btn btn-primary" (click)="unlock(u)" [attr.aria-label]="'Desbloquear ' + u.email"><mat-icon aria-hidden="true">lock_open</mat-icon>Desbloquear</button>
               }
               @if (u.status === 'Inativo') {
-                <button type="button" class="btn btn-outline" (click)="reactivate(u)" [attr.aria-label]="'Reativar ' + u.usuario"><mat-icon aria-hidden="true">undo</mat-icon>Reativar</button>
+                <button type="button" class="btn btn-outline" (click)="reactivate(u)" [attr.aria-label]="'Reativar ' + u.email"><mat-icon aria-hidden="true">undo</mat-icon>Reativar</button>
               } @else {
-                <button type="button" class="btn btn-outline" (click)="editProfile(u)" [attr.aria-label]="'Alterar perfil de ' + u.usuario"><mat-icon aria-hidden="true">badge</mat-icon>Perfil</button>
+                <button type="button" class="btn btn-outline" (click)="editProfile(u)" [attr.aria-label]="'Editar ' + u.email"><mat-icon aria-hidden="true">badge</mat-icon>Perfil</button>
                 <button type="button" class="btn btn-outline" (click)="reset(u)"
-                  [attr.aria-label]="(u.status === 'Pendente' ? 'Gerar novo código para ' : 'Redefinir acesso de ') + u.usuario">
+                  [attr.aria-label]="(u.status === 'Pendente' ? 'Gerar novo código para ' : 'Redefinir acesso de ') + u.email">
                   <mat-icon aria-hidden="true">key</mat-icon>{{ u.status === 'Pendente' ? 'Novo código' : 'Redefinir' }}
                 </button>
                 @if (!isSelf(u)) {
-                  <button type="button" class="btn btn-outline" (click)="deactivate(u)" [attr.aria-label]="'Desativar ' + u.usuario"><mat-icon aria-hidden="true">block</mat-icon>Desativar</button>
+                  <button type="button" class="btn btn-outline" (click)="deactivate(u)" [attr.aria-label]="'Desativar ' + u.email"><mat-icon aria-hidden="true">block</mat-icon>Desativar</button>
                 }
               }
             </div>

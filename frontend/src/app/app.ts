@@ -25,7 +25,7 @@ export class AppComponent {
     this.auth.ensureLoaded(); // descobre a sessão no boot (GET /api/auth/me)
   }
 
-  readonly initials = computed(() => (this.auth.user()?.usuario ?? '').slice(0, 2).toUpperCase());
+  readonly initials = computed(() => (this.auth.user()?.email ?? '').slice(0, 2).toUpperCase());
 
   /** Encerra a sessão em TODOS os dispositivos. Se falhar, a tela NÃO finge que saiu. */
   logout(): void {

@@ -32,31 +32,31 @@ namespace backend.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login(LoginDto dto, CancellationToken ct)
         {
-            var usuario = UsuarioRules.Normalize(dto.Usuario);
+            var email = EmailRules.Normalize(dto.Email);
 
             if (_ipLimiter.BlockedSeconds(ClientIp) is int ipWait) return RateLimited(ipWait);
-            if (await _throttle.LockedSecondsAsync(AuthThrottleService.Login, usuario, ct) is int wait)
+            if (await _throttle.LockedSecondsAsync(AuthThrottleService.Login, email, ct) is int wait)
             {
-                if (_gate.ShouldLog($"login:{usuario}")) await _audit.LogAsync("login_bloqueado", "falha", null, usuario);
+                if (_gate.ShouldLog($"login:{email}")) await _audit.LogAsync("login_bloqueado", "falha", null, email);
                 return Locked(wait);
             }
 
-            var user = await _db.Users.FirstOrDefaultAsync(u => u.Usuario == usuario, ct);
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email, ct);
             var ok = false;
             if (user is { IsActive: true, PasswordHash: not null })
                 ok = await _hasher.VerifyAsync(user.PasswordHash, dto.Senha);
             else
-                await _hasher.VerifyDummyAsync(dto.Senha);   // mesmo custo de tempo: nao revela se o usuario existe
+                await _hasher.VerifyDummyAsync(dto.Senha);   // mesmo custo de tempo: nao revela se o email existe
 
             if (!ok || user is null)
             {
-                await _throttle.RegisterFailureAsync(AuthThrottleService.Login, usuario, ct);
+                await _throttle.RegisterFailureAsync(AuthThrottleService.Login, email, ct);
                 _ipLimiter.RecordFailure(ClientIp);
-                await _audit.LogAsync("login_falha", "falha", null, usuario);
-                return Fail(401, "invalid_credentials", "Usuario ou senha invalidos");
+                await _audit.LogAsync("login_falha", "falha", null, email);
+                return Fail(401, "invalid_credentials", "E-mail ou senha invalidos");
             }
 
-            await _throttle.ResetAsync(AuthThrottleService.Login, usuario, ct);
+            await _throttle.ResetAsync(AuthThrottleService.Login, email, ct);
             if (_hasher.NeedsRehash(user.PasswordHash!)) user.PasswordHash = await _hasher.HashAsync(dto.Senha);
             user.LastLoginAt = DateTime.UtcNow;
             await _db.SaveChangesAsync(ct);
@@ -66,8 +66,8 @@ namespace backend.Controllers
                 new AuthenticationProperties { IsPersistent = true });
             HttpContext.User = principal;
             AuthSetup.IssueCsrfToken(HttpContext);
-            await _audit.LogAsync("login_ok", "ok", usuario, usuario);
-            return Ok(new MeDto(user.Usuario, user.Role));
+            await _audit.LogAsync("login_ok", "ok", email, email);
+            return Ok(new MeDto(user.Email, user.Role));
         }
 
         [HttpPost("logout")]
@@ -93,11 +93,11 @@ namespace backend.Controllers
         [HttpPost("senha")]
         public async Task<IActionResult> ChangePassword(ChangePasswordDto dto, CancellationToken ct)
         {
-            var usuario = ActorName!;
+            var email = ActorName!;
             if (dto.NovaSenha.Length < PasswordRules.Min || dto.NovaSenha.Length > PasswordRules.Max)
                 return PasswordError("password_too_short");
             if (_ipLimiter.BlockedSeconds(ClientIp) is int ipWait) return RateLimited(ipWait);
-            if (await _throttle.LockedSecondsAsync(AuthThrottleService.Login, usuario, ct) is int wait) return Locked(wait);
+            if (await _throttle.LockedSecondsAsync(AuthThrottleService.Login, email, ct) is int wait) return Locked(wait);
 
             var id = CurrentUserId();
             var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
@@ -105,21 +105,21 @@ namespace backend.Controllers
 
             if (!await _hasher.VerifyAsync(user.PasswordHash, dto.SenhaAtual))
             {
-                await _throttle.RegisterFailureAsync(AuthThrottleService.Login, usuario, ct);
+                await _throttle.RegisterFailureAsync(AuthThrottleService.Login, email, ct);
                 _ipLimiter.RecordFailure(ClientIp);
-                await _audit.LogAsync("senha_alterada", "falha", usuario, usuario, "senha atual incorreta");
+                await _audit.LogAsync("senha_alterada", "falha", email, email, "senha atual incorreta");
                 // 400 (nao 401): o front nao deve deslogar a pessoa por digitar a senha atual errada
                 return Fail(400, "current_password_invalid", "Senha atual incorreta");
             }
 
-            if (PasswordPolicy.Validate(dto.NovaSenha, usuario) is string policy) return PasswordError(policy);
+            if (PasswordPolicy.Validate(dto.NovaSenha, email) is string policy) return PasswordError(policy);
 
             user.PasswordHash = await _hasher.HashAsync(dto.NovaSenha);
             user.SecurityStamp = Guid.NewGuid().ToString("N");   // derruba as outras sessoes
             user.UpdatedAt = DateTime.UtcNow;
-            user.UpdatedBy = usuario;
+            user.UpdatedBy = email;
             await _db.SaveChangesAsync(ct);
-            await _throttle.ResetAsync(AuthThrottleService.Login, usuario, ct);
+            await _throttle.ResetAsync(AuthThrottleService.Login, email, ct);
 
             // reemite a sessao desta pessoa com o stamp novo (continua logada)
             var principal = AuthSetup.BuildPrincipal(user, AuthSetup.AbsoluteOf(User));
@@ -127,7 +127,7 @@ namespace backend.Controllers
                 new AuthenticationProperties { IsPersistent = true });
             HttpContext.User = principal;
             AuthSetup.IssueCsrfToken(HttpContext);
-            await _audit.LogAsync("senha_alterada", "ok", usuario, usuario);
+            await _audit.LogAsync("senha_alterada", "ok", email, email);
             return NoContent();
         }
 
@@ -135,7 +135,7 @@ namespace backend.Controllers
         [HttpPost("ativar")]
         public async Task<IActionResult> Activate(AtivarDto dto, CancellationToken ct)
         {
-            var usuario = UsuarioRules.Normalize(dto.Usuario);
+            var email = EmailRules.Normalize(dto.Email);
 
             // 1) formato
             var code = ActivationCodes.Normalize(dto.Codigo);
@@ -147,22 +147,22 @@ namespace backend.Controllers
             if (!_codes.IsConfigured)
                 return Fail(503, "service_misconfigured", "Servico indisponivel", "Ativacao indisponivel no momento.");
 
-            // 2) bloqueio (por usuario, existente ou nao, e por IP)
+            // 2) bloqueio (por email, existente ou nao, e por IP)
             if (_ipLimiter.BlockedSeconds(ClientIp) is int ipWait) return RateLimited(ipWait);
-            if (await _throttle.LockedSecondsAsync(AuthThrottleService.Activate, usuario, ct) is int wait)
+            if (await _throttle.LockedSecondsAsync(AuthThrottleService.Activate, email, ct) is int wait)
             {
-                if (_gate.ShouldLog($"ativar:{usuario}")) await _audit.LogAsync("ativacao_bloqueada", "falha", null, usuario);
+                if (_gate.ShouldLog($"ativar:{email}")) await _audit.LogAsync("ativacao_bloqueada", "falha", null, email);
                 return Locked(wait);
             }
 
-            // 3) codigo (comparacao em tempo constante; usuario inexistente = mesma comparacao com valor falso)
-            var user = await _db.Users.FirstOrDefaultAsync(u => u.Usuario == usuario, ct);
-            var matches = _codes.Matches(user?.ActivationCodeHash, usuario, code);
+            // 3) codigo (comparacao em tempo constante; email inexistente = mesma comparacao com valor falso)
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email, ct);
+            var matches = _codes.Matches(user?.ActivationCodeHash, email, code);
             if (user is null || !user.IsActive || !matches)
             {
-                await _throttle.RegisterFailureAsync(AuthThrottleService.Activate, usuario, ct);
+                await _throttle.RegisterFailureAsync(AuthThrottleService.Activate, email, ct);
                 _ipLimiter.RecordFailure(ClientIp);
-                await _audit.LogAsync("ativacao_falha", "falha", null, usuario);
+                await _audit.LogAsync("ativacao_falha", "falha", null, email);
                 return Fail(400, "activation_code_invalid", "Codigo de ativacao invalido");
             }
 
@@ -173,7 +173,7 @@ namespace backend.Controllers
                 return Fail(410, "activation_code_expired", "Codigo de ativacao expirado", "Peca um novo codigo ao administrador.");
 
             // 4) politica da senha: NAO consome o codigo nem conta como falha
-            if (PasswordPolicy.Validate(dto.NovaSenha, usuario) is string policy) return PasswordError(policy);
+            if (PasswordPolicy.Validate(dto.NovaSenha, email) is string policy) return PasswordError(policy);
 
             // 5) consome (atomico: so um request vence)
             var hash = await _hasher.HashAsync(dto.NovaSenha);
@@ -186,11 +186,11 @@ namespace backend.Controllers
                     .SetProperty(u => u.ActivationUsedAt, now)
                     .SetProperty(u => u.SecurityStamp, stamp)
                     .SetProperty(u => u.UpdatedAt, now)
-                    .SetProperty(u => u.UpdatedBy, usuario), ct);
+                    .SetProperty(u => u.UpdatedBy, email), ct);
             if (affected == 0) return Fail(409, "activation_code_used", "Codigo de ativacao ja utilizado");
 
-            await _throttle.ResetAsync(AuthThrottleService.Activate, usuario, ct);
-            await _audit.LogAsync("ativacao_ok", "ok", usuario, usuario);
+            await _throttle.ResetAsync(AuthThrottleService.Activate, email, ct);
+            await _audit.LogAsync("ativacao_ok", "ok", email, email);
             return NoContent();
         }
 

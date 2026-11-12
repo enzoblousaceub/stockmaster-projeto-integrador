@@ -5,29 +5,34 @@ using backend.Security;
 
 namespace backend.DTOs
 {
-    public static class UsuarioRules
+    public static class EmailRules
     {
-        public const string Pattern = "^[a-zA-Z0-9._-]{3,32}$";
-        public static string Normalize(string usuario) => usuario.Trim().ToLowerInvariant();
-        public static bool IsValid(string? usuario) =>
-            usuario is not null && System.Text.RegularExpressions.Regex.IsMatch(usuario.Trim(), Pattern);
+        public const int MaxLength = 254;
+        public static string Normalize(string email) => email.Trim().ToLowerInvariant();
+        public static bool IsValid(string? email)
+        {
+            var t = email?.Trim();
+            if (string.IsNullOrEmpty(t) || t.Length > MaxLength || t.Any(char.IsWhiteSpace) || !new EmailAddressAttribute().IsValid(t)) return false;
+            var at = t.LastIndexOf('@');
+            return at > 0 && t.IndexOf('.', at) > at + 1 && !t.EndsWith('.');
+        }
     }
 
     public class LoginDto
     {
-        [Required, RegularExpression(UsuarioRules.Pattern)]
-        public string Usuario { get; set; } = string.Empty;
+        [Required, EmailAddress, MaxLength(EmailRules.MaxLength)]
+        public string Email { get; set; } = string.Empty;
 
         [Required, MaxLength(PasswordRules.Max)]
         public string Senha { get; set; } = string.Empty;
     }
 
-    public record MeDto(string Usuario, string Perfil);
+    public record MeDto(string Email, string Perfil);
 
     public class AtivarDto
     {
-        [Required, RegularExpression(UsuarioRules.Pattern)]
-        public string Usuario { get; set; } = string.Empty;
+        [Required, EmailAddress, MaxLength(EmailRules.MaxLength)]
+        public string Email { get; set; } = string.Empty;
 
         [Required, MaxLength(40)]
         public string Codigo { get; set; } = string.Empty;
@@ -47,8 +52,8 @@ namespace backend.DTOs
 
     public class CreateUserDto
     {
-        [Required, RegularExpression(UsuarioRules.Pattern)]
-        public string Usuario { get; set; } = string.Empty;
+        [Required, EmailAddress, MaxLength(EmailRules.MaxLength)]
+        public string Email { get; set; } = string.Empty;
 
         [Required]
         public string Perfil { get; set; } = string.Empty;
@@ -59,12 +64,14 @@ namespace backend.DTOs
     {
         public string? Perfil { get; set; }
         public bool? Ativo { get; set; }
+        [EmailAddress, MaxLength(EmailRules.MaxLength)]
+        public string? Email { get; set; }
     }
 
     public class UserDto
     {
         public int Id { get; set; }
-        public string Usuario { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
         public string Perfil { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public DateTime? BloqueadoAte { get; set; }
@@ -76,11 +83,14 @@ namespace backend.DTOs
         public DateTime? CodigoExpiraEm { get; set; }
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? CodigoAtivacao { get; set; }
+        /// <summary>true = convite enviado por e-mail (o codigo nao e devolvido); false = falhou (o codigo vem junto).</summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? EmailEnviado { get; set; }
 
-        public static UserDto From(AppUser u, DateTime? lockedUntil = null, string? code = null) => new()
+        public static UserDto From(AppUser u, DateTime? lockedUntil = null, string? code = null, bool? emailSent = null) => new()
         {
             Id = u.Id,
-            Usuario = u.Usuario,
+            Email = u.Email,
             Perfil = u.Role,
             Status = u.Status,
             BloqueadoAte = lockedUntil,
@@ -90,7 +100,8 @@ namespace backend.DTOs
             AtualizadoPor = u.UpdatedBy,
             UltimoLoginEm = u.LastLoginAt,
             CodigoExpiraEm = u.Status == UserStatus.Pending && u.ActivationUsedAt is null ? u.ActivationExpiresAt : null,
-            CodigoAtivacao = code
+            CodigoAtivacao = code,
+            EmailEnviado = emailSent
         };
     }
 

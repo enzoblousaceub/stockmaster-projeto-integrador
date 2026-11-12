@@ -5,7 +5,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { AuthService } from '../../core/auth.service';
 import { messageFor, parseProblem } from '../../core/api-error';
-import { ManagedUser } from '../../models/auth.model';
+import { ActivationCode, ManagedUser } from '../../models/auth.model';
 import { UserService } from '../../services/user.service';
 import { ConfirmDialogComponent } from '../../components/confirm-dialog/confirm-dialog';
 import { CodeDialogComponent } from '../../components/code-dialog/code-dialog';
@@ -46,7 +46,7 @@ export class UsersComponent implements OnInit {
   }
 
   isSelf(u: ManagedUser): boolean {
-    return this.auth.user()?.usuario === u.usuario;
+    return this.auth.user()?.email === u.email;
   }
 
   isLocked(u: ManagedUser): boolean {
@@ -61,7 +61,7 @@ export class UsersComponent implements OnInit {
   }
 
   initials(u: ManagedUser): string {
-    return u.usuario.slice(0, 2).toUpperCase();
+    return u.email.slice(0, 2).toUpperCase();
   }
 
   // ---------- ações ----------
@@ -70,7 +70,7 @@ export class UsersComponent implements OnInit {
       width: '460px', maxWidth: 'calc(100vw - 32px)', ariaLabelledBy: 'create-title'
     }).afterClosed().subscribe((created) => {
       if (!created) return;
-      this.showCode(`Usuário ${created.usuario} criado`, created.usuario, created.codigoAtivacao, created.codigoExpiraEm);
+      this.deliver(`Usuário ${created.email} criado`, created.email, created);
       this.fetch();
     });
   }
@@ -80,7 +80,8 @@ export class UsersComponent implements OnInit {
       width: '460px', maxWidth: 'calc(100vw - 32px)', ariaLabelledBy: 'edit-title', data: { user: u }
     }).afterClosed().subscribe((updated) => {
       if (!updated) return;
-      this.say(`Perfil de ${u.usuario} atualizado.`);
+      if (updated.emailEnviado != null) this.deliver(`Novo convite para ${updated.email}`, updated.email, updated as ActivationCode);
+      else this.say(`${u.email} atualizado.`);
       this.fetch();
     });
   }
@@ -88,7 +89,7 @@ export class UsersComponent implements OnInit {
   reset(u: ManagedUser): void {
     const pending = u.status === 'Pendente';
     this.confirm({
-      title: pending ? `Gerar novo código para ${u.usuario}?` : `Redefinir o acesso de ${u.usuario}?`,
+      title: pending ? `Gerar novo código para ${u.email}?` : `Redefinir o acesso de ${u.email}?`,
       message: pending
         ? 'O código anterior deixa de valer e um novo será gerado. Ele é mostrado uma única vez, na próxima tela.'
         : 'A senha atual deixa de valer, as sessões abertas são encerradas e a pessoa volta a Pendente. Um novo código de ativação será gerado e mostrado uma única vez.',
@@ -96,7 +97,7 @@ export class UsersComponent implements OnInit {
       icon: 'key'
     }, () => this.users.reset(u.id).subscribe({
       next: (r) => {
-        this.showCode(`Novo código para ${u.usuario}`, u.usuario, r.codigoAtivacao, r.codigoExpiraEm);
+        this.deliver(`Novo código para ${u.email}`, u.email, r);
         this.fetch();
       },
       error: (err) => this.fail(err)
@@ -105,13 +106,13 @@ export class UsersComponent implements OnInit {
 
   deactivate(u: ManagedUser): void {
     this.confirm({
-      title: `Desativar ${u.usuario}?`,
+      title: `Desativar ${u.email}?`,
       message: 'A pessoa perde o acesso e as sessões abertas são encerradas na hora. Você pode reativar depois.',
       confirmLabel: 'Desativar',
       icon: 'block',
       danger: true
     }, () => this.users.patch(u.id, { ativo: false }).subscribe({
-      next: () => { this.say(`${u.usuario} desativado.`); this.fetch(); },
+      next: () => { this.say(`${u.email} desativado.`); this.fetch(); },
       error: (err) => this.fail(err)
     }));
   }
@@ -119,10 +120,10 @@ export class UsersComponent implements OnInit {
   reactivate(u: ManagedUser): void {
     this.users.patch(u.id, { ativo: true }).subscribe({
       next: (r) => {
-        if (r.codigoAtivacao && r.codigoExpiraEm) {
-          this.showCode(`${u.usuario} reativado`, u.usuario, r.codigoAtivacao, r.codigoExpiraEm);
+        if (r.codigoAtivacao || r.emailEnviado) {
+          this.deliver(`${u.email} reativado`, u.email, r);
         } else {
-          this.say(`${u.usuario} reativado.`);
+          this.say(`${u.email} reativado.`);
         }
         this.fetch();
       },
@@ -132,7 +133,7 @@ export class UsersComponent implements OnInit {
 
   unlock(u: ManagedUser): void {
     this.users.unlock(u.id).subscribe({
-      next: () => { this.say(`${u.usuario} desbloqueado.`); this.fetch(); },
+      next: () => { this.say(`${u.email} desbloqueado.`); this.fetch(); },
       error: (err) => this.fail(err)
     });
   }
@@ -142,6 +143,16 @@ export class UsersComponent implements OnInit {
     this.dialog.open(ConfirmDialogComponent, {
       width: '440px', maxWidth: 'calc(100vw - 32px)', ariaLabelledBy: 'confirm-title', ariaDescribedBy: 'confirm-desc', data
     }).afterClosed().subscribe((ok) => ok && then());
+  }
+
+  /** Convite enviado por e-mail: só avisa. Falha no envio: mostra o código para o Admin repassar. */
+  private deliver(title: string, email: string, r: ActivationCode): void {
+    if (r.emailEnviado) {
+      this.say(`Convite enviado por e-mail para ${email}.`);
+      return;
+    }
+    if (r.emailEnviado === false) this.snack.open('Não foi possível enviar o e-mail. Repasse o código manualmente.', 'Fechar', { duration: 6000 });
+    if (r.codigoAtivacao) this.showCode(title, email, r.codigoAtivacao, r.codigoExpiraEm);
   }
 
   private showCode(title: string, usuario: string, code: string, expiresAt: string): void {

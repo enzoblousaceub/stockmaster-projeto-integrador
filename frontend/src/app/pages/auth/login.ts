@@ -16,7 +16,7 @@ export class LoginComponent implements OnDestroy {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
 
-  readonly usuario = signal('');
+  readonly email = signal('');
   readonly senha = signal('');
   readonly showPassword = signal(false);
   readonly loading = signal(false);
@@ -34,15 +34,15 @@ export class LoginComponent implements OnDestroy {
 
   submit(): void {
     if (this.loading() || this.wait() > 0) return;
-    const usuario = this.usuario().trim();
+    const email = this.email().trim();
     const senha = this.senha();
-    if (!usuario || !senha) {
+    if (!email || !senha) {
       this.error.set('Informe o usuário e a senha.');
       return;
     }
     this.error.set('');
     this.loading.set(true);
-    this.auth.login(usuario, senha).subscribe({
+    this.auth.login(email, senha).subscribe({
       next: () => {
         this.loading.set(false);
         this.senha.set('');

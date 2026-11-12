@@ -17,7 +17,7 @@
     <div class="auth-card">
       <div class="brand brand-mobile"><img src="brand/mark.svg" alt="" width="36" height="36">Stock Master</div>
       <h1>Entrar</h1>
-      <p class="sub">Use seu usuário e senha para acessar o sistema.</p>
+      <p class="sub">Use seu e-mail e senha para acessar o sistema.</p>
 
       @if (activated) {
         <div class="notice notice--ok" role="status"><mat-icon aria-hidden="true">check_circle</mat-icon><span>Acesso ativado. Entre com a senha que você acabou de criar.</span></div>
@@ -36,11 +36,11 @@
 
       <form (submit)="$event.preventDefault(); submit()" novalidate>
         <div class="field">
-          <label for="login-usuario">Usuário</label>
+          <label for="login-email">E-mail</label>
           <div class="input has-lead">
-            <mat-icon class="lead" aria-hidden="true">person</mat-icon>
-            <input #u id="login-usuario" name="usuario" type="text" autocomplete="username" autocapitalize="none"
-              spellcheck="false" enterkeyhint="next" [value]="usuario()" (input)="usuario.set(u.value)">
+            <mat-icon class="lead" aria-hidden="true">mail</mat-icon>
+            <input #u id="login-email" name="email" type="email" inputmode="email" autocomplete="username" autocapitalize="none"
+              spellcheck="false" enterkeyhint="next" [value]="email()" (input)="email.set(u.value)">
           </div>
         </div>
         <div class="field">

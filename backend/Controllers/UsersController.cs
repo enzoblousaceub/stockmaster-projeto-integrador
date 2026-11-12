@@ -18,23 +18,32 @@ namespace backend.Controllers
         private readonly ActivationCodes _codes;
         private readonly AuthThrottleService _throttle;
         private readonly AuditService _audit;
+        private readonly InviteMailer _mailer;
 
-        public UsersController(AppDbContext db, ActivationCodes codes, AuthThrottleService throttle, AuditService audit)
+        public UsersController(AppDbContext db, ActivationCodes codes, AuthThrottleService throttle, AuditService audit, InviteMailer mailer)
         {
-            _db = db; _codes = codes; _throttle = throttle; _audit = audit;
+            _db = db; _codes = codes; _throttle = throttle; _audit = audit; _mailer = mailer;
+        }
+
+        /// <summary>Envia o convite. Com sucesso o codigo NAO volta na resposta (so quem recebe o e-mail o conhece); com falha, volta para o Admin repassar.</summary>
+        private async Task<(string? Code, bool Sent)> InviteAsync(AppUser user, string code, CancellationToken ct)
+        {
+            var sent = await _mailer.SendAsync(user, code, Request, ct);
+            await _audit.LogAsync("convite_email", sent ? "ok" : "falha", ActorName, user.Email);
+            return (sent ? null : code, sent);
         }
 
         [HttpGet]
         public async Task<ActionResult<IEnumerable<UserDto>>> List(CancellationToken ct)
         {
-            var users = await _db.Users.AsNoTracking().OrderBy(u => u.Usuario).ToListAsync(ct);
+            var users = await _db.Users.AsNoTracking().OrderBy(u => u.Email).ToListAsync(ct);
             var now = DateTime.UtcNow;
             var locks = await _db.AuthThrottles.AsNoTracking()
                 .Where(t => t.LockedUntil > now)
                 .GroupBy(t => t.Key)
                 .Select(g => new { Key = g.Key, Until = g.Max(t => t.LockedUntil) })
                 .ToDictionaryAsync(x => x.Key, x => x.Until, ct);
-            return Ok(users.Select(u => UserDto.From(u, locks.GetValueOrDefault(u.Usuario))));
+            return Ok(users.Select(u => UserDto.From(u, locks.GetValueOrDefault(u.Email))));
         }
 
         [HttpPost]
@@ -43,13 +52,14 @@ namespace backend.Controllers
             if (!Roles.IsValid(dto.Perfil)) return InvalidProfile();
             if (!_codes.IsConfigured) return Misconfigured();
 
-            var usuario = UsuarioRules.Normalize(dto.Usuario);
-            if (await _db.Users.AnyAsync(u => u.Usuario == usuario, ct)) return Exists();
+            if (!EmailRules.IsValid(dto.Email)) return InvalidEmail();
+            var usuario = EmailRules.Normalize(dto.Email);
+            if (await _db.Users.AnyAsync(u => u.Email == usuario, ct)) return Exists();
 
             var (code, normalized) = NewCode();
             var user = new AppUser
             {
-                Usuario = usuario,
+                Email = usuario,
                 Role = dto.Perfil,
                 CreatedBy = ActorName,
                 UpdatedBy = ActorName
@@ -66,15 +76,17 @@ namespace backend.Controllers
             }
 
             await _audit.LogAsync("usuario_criado", "ok", ActorName, usuario, $"perfil {dto.Perfil}");
-            return StatusCode(201, UserDto.From(user, null, code));
+            var (shown, sent) = await InviteAsync(user, code, ct);
+            return StatusCode(201, UserDto.From(user, null, shown, sent));
         }
 
         [HttpPatch("{id:int}")]
         public async Task<IActionResult> Update(int id, UpdateUserDto dto, CancellationToken ct)
         {
-            if (dto.Perfil is null && dto.Ativo is null)
-                return Fail(400, "validation_error", "Dados invalidos", "Informe perfil e/ou ativo.");
+            if (dto.Perfil is null && dto.Ativo is null && dto.Email is null)
+                return Fail(400, "validation_error", "Dados invalidos", "Informe perfil, ativo e/ou email.");
             if (dto.Perfil is not null && !Roles.IsValid(dto.Perfil)) return InvalidProfile();
+            if (dto.Email is not null && !EmailRules.IsValid(dto.Email)) return InvalidEmail();
 
             // serializa as operacoes que podem remover um Admin ativo (evita dois Admins se removendo ao mesmo tempo)
             await using var tx = await BeginAdminLockAsync(ct);
@@ -86,12 +98,20 @@ namespace backend.Controllers
             var roleChanged = newRole != user.Role;
             var activeChanged = newActive != user.IsActive;
 
+            var newEmail = dto.Email is null ? user.Email : EmailRules.Normalize(dto.Email);
+            var emailChanged = newEmail != user.Email;
+            // e-mail so muda enquanto a pessoa ainda nao definiu senha (o codigo e amarrado ao e-mail)
+            if (emailChanged && user.PasswordHash is not null)
+                return Fail(409, "email_locked", "E-mail bloqueado", "O e-mail so pode ser alterado enquanto a pessoa nao ativou o acesso.");
+            if (emailChanged && await _db.Users.AnyAsync(u => u.Id != user.Id && u.Email == newEmail, ct)) return Exists();
+
             // repetir o mesmo estado e idempotente: 200 sem mudanca
-            if (!roleChanged && !activeChanged) return Ok(UserDto.From(user, await LockedUntil(user.Usuario, ct)));
+            if (!roleChanged && !activeChanged && !emailChanged) return Ok(UserDto.From(user, await LockedUntil(user.Email, ct)));
 
             if (user.IsLoginCapableAdmin && (!newActive || newRole != Roles.Admin) && !await HasOtherCapableAdmin(user.Id, ct))
                 return LastAdmin();
 
+            if (emailChanged) user.Email = newEmail;   // antes de gerar codigo: o hash do codigo leva o e-mail
             string? code = null;
             if (activeChanged && !newActive)
             {
@@ -107,7 +127,18 @@ namespace backend.Controllers
                     if (!_codes.IsConfigured) return Misconfigured();
                     var n = NewCode();
                     code = n.Code;
-                    SetActivation(user, user.Usuario, n.Normalized);
+                    SetActivation(user, user.Email, n.Normalized);
+                }
+            }
+            if (emailChanged)
+            {
+                // o codigo anterior era amarrado ao e-mail antigo: emite outro (se a conta esta ativa)
+                if (newActive && code is null)
+                {
+                    if (!_codes.IsConfigured) return Misconfigured();
+                    var n = NewCode();
+                    code = n.Code;
+                    SetActivation(user, user.Email, n.Normalized);
                 }
             }
             user.Role = newRole;
@@ -117,9 +148,13 @@ namespace backend.Controllers
             await _db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
 
-            if (roleChanged) await _audit.LogAsync("usuario_perfil_alterado", "ok", ActorName, user.Usuario, $"perfil {newRole}");
-            if (activeChanged) await _audit.LogAsync(newActive ? "usuario_reativado" : "usuario_desativado", "ok", ActorName, user.Usuario);
-            return Ok(UserDto.From(user, await LockedUntil(user.Usuario, ct), code));
+            if (roleChanged) await _audit.LogAsync("usuario_perfil_alterado", "ok", ActorName, user.Email, $"perfil {newRole}");
+            if (activeChanged) await _audit.LogAsync(newActive ? "usuario_reativado" : "usuario_desativado", "ok", ActorName, user.Email);
+            if (emailChanged) await _audit.LogAsync("usuario_email_alterado", "ok", ActorName, user.Email);
+            bool? sent = null;
+            string? shown = code;
+            if (code is not null) (shown, sent) = await InviteAsync(user, code, ct);
+            return Ok(UserDto.From(user, await LockedUntil(user.Email, ct), shown, sent));
         }
 
         [HttpPost("{id:int}/reset")]
@@ -136,14 +171,15 @@ namespace backend.Controllers
             var (code, normalized) = NewCode();
             user.PasswordHash = null;
             user.SecurityStamp = Guid.NewGuid().ToString("N");
-            SetActivation(user, user.Usuario, normalized);
+            SetActivation(user, user.Email, normalized);
             user.UpdatedAt = DateTime.UtcNow;
             user.UpdatedBy = ActorName;
             await _db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
 
-            await _audit.LogAsync("usuario_resetado", "ok", ActorName, user.Usuario);
-            return Ok(new { codigoAtivacao = code, codigoExpiraEm = user.ActivationExpiresAt });
+            await _audit.LogAsync("usuario_resetado", "ok", ActorName, user.Email);
+            var (shown, sent) = await InviteAsync(user, code, ct);
+            return Ok(new { codigoAtivacao = shown, codigoExpiraEm = user.ActivationExpiresAt, emailEnviado = sent });
         }
 
         [HttpPost("{id:int}/desbloquear")]
@@ -151,8 +187,8 @@ namespace backend.Controllers
         {
             var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id, ct);
             if (user is null) return NotFoundUser(id);
-            await _throttle.ResetAllAsync(user.Usuario, ct);
-            await _audit.LogAsync("usuario_desbloqueado", "ok", ActorName, user.Usuario);
+            await _throttle.ResetAllAsync(user.Email, ct);
+            await _audit.LogAsync("usuario_desbloqueado", "ok", ActorName, user.Email);
             return NoContent();
         }
 
@@ -187,7 +223,9 @@ namespace backend.Controllers
         private ObjectResult InvalidProfile() => Fail(400, "validation_error", "Dados invalidos",
             errors: new Dictionary<string, string> { ["perfil"] = $"Perfil deve ser exatamente \"{Roles.Admin}\" ou \"{Roles.Viewer}\"." });
 
-        private ObjectResult Exists() => Fail(409, "usuario_exists", "Usuario ja existe");
+        private ObjectResult InvalidEmail() => Fail(400, "validation_error", "Dados invalidos",
+            errors: new Dictionary<string, string> { ["email"] = "Informe um e-mail valido." });
+        private ObjectResult Exists() => Fail(409, "email_exists", "E-mail ja cadastrado");
         private ObjectResult LastAdmin() => Fail(409, "last_admin", "Ultimo administrador",
             "A operacao deixaria o sistema sem nenhum Admin ativo.");
         private ObjectResult Misconfigured() => Fail(503, "service_misconfigured", "Servico indisponivel",

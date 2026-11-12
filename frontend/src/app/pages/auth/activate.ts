@@ -15,7 +15,7 @@ export class ActivateComponent implements OnDestroy {
   private auth = inject(AuthService);
   private router = inject(Router);
 
-  readonly usuario = signal('');
+  readonly email = signal('');
   readonly codigo = signal('');
   readonly novaSenha = signal('');
   readonly repetir = signal('');
@@ -30,15 +30,25 @@ export class ActivateComponent implements OnDestroy {
 
   private timer?: ReturnType<typeof setInterval>;
 
+  constructor() {
+    // Link do e-mail: /ativar#email=...&codigo=... (fragmento: não vai para o servidor nem para logs/Referer)
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const email = hash.get('email');
+    const codigo = hash.get('codigo');
+    if (email) this.email.set(email);
+    if (codigo) this.codigo.set(codigo);
+    if (email || codigo) history.replaceState(null, '', window.location.pathname);
+  }
+
   submit(): void {
     if (this.loading() || this.wait() > 0) return;
     this.error.set('');
     this.passwordError.set('');
-    const usuario = this.usuario().trim();
+    const email = this.email().trim();
     const codigo = this.codigo().trim();
     const nova = this.novaSenha();
 
-    if (!usuario || !codigo) {
+    if (!email || !codigo) {
       this.error.set('Informe o usuário e o código de ativação.');
       return;
     }
@@ -52,7 +62,7 @@ export class ActivateComponent implements OnDestroy {
     }
 
     this.loading.set(true);
-    this.auth.activate(usuario, codigo, nova).subscribe({
+    this.auth.activate(email, codigo, nova).subscribe({
       next: () => {
         this.loading.set(false);
         this.router.navigate(['/login'], { queryParams: { ativado: 1 } });

@@ -14,13 +14,12 @@ import { PERFIS } from './perfis';
     <h2 mat-dialog-title id="create-title">Novo usuário</h2>
     <form (submit)="$event.preventDefault(); submit()" novalidate>
       <mat-dialog-content>
-        <p class="sub">A pessoa define a própria senha com um código de ativação.</p>
+        <p class="sub">A pessoa recebe um convite por e-mail para criar a própria senha.</p>
         @if (error()) { <div class="alert" role="alert">{{ error() }}</div> }
         <div class="field">
-          <label for="new-usuario">Usuário</label>
-          <input #u id="new-usuario" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="32"
-            aria-describedby="new-usuario-hint" [attr.aria-invalid]="error() ? 'true' : null" [value]="usuario()" (input)="usuario.set(u.value)">
-          <span class="hint" id="new-usuario-hint">3 a 32 caracteres: letras minúsculas, números, ponto, hífen ou sublinhado.</span>
+          <label for="new-email">E-mail</label>
+          <input #e id="new-email" type="email" inputmode="email" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="254"
+            [attr.aria-invalid]="error() ? 'true' : null" [value]="email()" (input)="email.set(e.value)">
         </div>
         <div class="field">
           <label for="new-perfil">Perfil</label>
@@ -31,7 +30,7 @@ import { PERFIS } from './perfis';
       </mat-dialog-content>
       <mat-dialog-actions align="end">
         <button type="button" class="btn btn-outline" mat-dialog-close>Cancelar</button>
-        <button type="submit" class="btn btn-primary" [disabled]="loading()" id="btn-create-user">{{ loading() ? 'Criando…' : 'Criar usuário' }}</button>
+        <button type="submit" class="btn btn-primary" [disabled]="loading()" id="btn-create-user">{{ loading() ? 'Enviando…' : 'Criar e enviar convite' }}</button>
       </mat-dialog-actions>
     </form>
   `,
@@ -42,21 +41,21 @@ export class CreateUserDialogComponent {
   private ref = inject<MatDialogRef<CreateUserDialogComponent, CreatedUser>>(MatDialogRef);
 
   readonly perfis = PERFIS;
-  readonly usuario = signal('');
+  readonly email = signal('');
   readonly perfil = signal<Perfil>('Visualizador');
   readonly loading = signal(false);
   readonly error = signal('');
 
   submit(): void {
     if (this.loading()) return;
-    const usuario = this.usuario().trim().toLowerCase();
-    if (!/^[a-z0-9._-]{3,32}$/.test(usuario)) {
-      this.error.set('O usuário deve ter de 3 a 32 caracteres: letras minúsculas, números, ponto, hífen ou sublinhado.');
+    const email = this.email().trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+      this.error.set('Informe um e-mail válido.');
       return;
     }
     this.error.set('');
     this.loading.set(true);
-    this.users.create(usuario, this.perfil()).subscribe({
+    this.users.create(email, this.perfil()).subscribe({
       next: (created) => this.ref.close(created),
       error: (err) => {
         this.loading.set(false);

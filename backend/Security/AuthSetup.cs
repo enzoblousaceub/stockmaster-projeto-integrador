@@ -95,6 +95,8 @@ namespace backend.Security
             services.AddSingleton<BlockedAuditGate>();
             services.AddSingleton<Pbkdf2PasswordHasher>();
             services.AddSingleton<ActivationCodes>();
+            services.AddHttpClient<IEmailSender, ResendEmailSender>(c => c.Timeout = TimeSpan.FromSeconds(10));
+            services.AddScoped<InviteMailer>();
             services.AddSingleton<IpFailureLimiter>();
             services.AddScoped<AuthThrottleService>();
             services.AddScoped<AuditService>();
@@ -138,7 +140,7 @@ namespace backend.Security
             var identity = new ClaimsIdentity(new[]
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.Name, user.Usuario),
+                new Claim(ClaimTypes.Name, user.Email),
                 new Claim(ClaimTypes.Role, user.Role),
                 new Claim(StampClaim, user.SecurityStamp),
                 new Claim(AbsoluteClaim, abs.ToString())

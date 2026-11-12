@@ -38,7 +38,7 @@ export interface CodeDialogData {
       <div class="sr-only" role="status" aria-live="polite">{{ copied() ? 'Código copiado' : '' }}</div>
       @if (!copied()) { <p class="hint">Copie o código antes de concluir: ele não poderá ser consultado depois.</p> }
       @if (failed()) { <p class="hint" role="alert">Não foi possível copiar automaticamente. Selecione o código e copie manualmente.</p> }
-      <p class="hint">{{ data.usuario }} ativa o acesso em <b>/ativar</b>, com o usuário, o código e uma nova senha.</p>
+      <p class="hint">{{ data.usuario }} ativa o acesso em <b>/ativar</b>, com o e-mail, o código e uma nova senha.</p>
     </mat-dialog-content>
     <mat-dialog-actions align="end">
       <button type="button" class="btn btn-primary" mat-dialog-close cdkFocusInitial id="btn-code-done">Concluir</button>
