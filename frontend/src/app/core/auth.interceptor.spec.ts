@@ -16,7 +16,7 @@ describe('authInterceptor', () => {
   let snack: { open: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
-    auth = { sessionExpired: vi.fn(), refresh: vi.fn(() => of({ usuario: 'maria', perfil: 'Admin' })) };
+    auth = { sessionExpired: vi.fn(), refresh: vi.fn(() => of({ email: 'maria@exemplo.com', perfil: 'Admin' })) };
     snack = { open: vi.fn() };
     TestBed.configureTestingModule({
       providers: [
@@ -81,7 +81,7 @@ describe('authInterceptor', () => {
 
   it('o retry de csrf_invalid usa o token NOVO (cookie renovado), não o antigo', () => {
     document.cookie = 'XSRF-TOKEN=velho; path=/';
-    auth.refresh.mockImplementation(() => { document.cookie = 'XSRF-TOKEN=novo; path=/'; return of({ usuario: 'maria', perfil: 'Admin' }); });
+    auth.refresh.mockImplementation(() => { document.cookie = 'XSRF-TOKEN=novo; path=/'; return of({ email: 'maria@exemplo.com', perfil: 'Admin' }); });
 
     http.post('/api/products', {}).subscribe();
     const first = ctrl.expectOne('/api/products');

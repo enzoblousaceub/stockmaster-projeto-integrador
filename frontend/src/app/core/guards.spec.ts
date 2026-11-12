@@ -53,23 +53,23 @@ describe('guardas de rota', () => {
   });
 
   it('authGuard com sessão libera a rota', async () => {
-    const res = await respondMe(run(authGuard), 200, { usuario: 'maria', perfil: 'Admin' });
+    const res = await respondMe(run(authGuard), 200, { email: 'maria@exemplo.com', perfil: 'Admin' });
     expect(res).toBe(true);
   });
 
   it('adminGuard bloqueia Visualizador, avisa e volta ao início', async () => {
-    const res = await respondMe(run(adminGuard), 200, { usuario: 'joao', perfil: 'Visualizador' });
+    const res = await respondMe(run(adminGuard), 200, { email: 'joao@exemplo.com', perfil: 'Visualizador' });
     expect(router.serializeUrl(res as UrlTree)).toBe('/');
     expect(snack.open).toHaveBeenCalledTimes(1);
   });
 
   it('adminGuard libera Admin', async () => {
-    const res = await respondMe(run(adminGuard), 200, { usuario: 'maria', perfil: 'Admin' });
+    const res = await respondMe(run(adminGuard), 200, { email: 'maria@exemplo.com', perfil: 'Admin' });
     expect(res).toBe(true);
   });
 
   it('guestGuard: quem já está logado vai ao início; visitante vê o login', async () => {
-    const logged = await respondMe(run(guestGuard, '/login'), 200, { usuario: 'maria', perfil: 'Admin' });
+    const logged = await respondMe(run(guestGuard, '/login'), 200, { email: 'maria@exemplo.com', perfil: 'Admin' });
     expect(router.serializeUrl(logged as UrlTree)).toBe('/');
   });
 
@@ -95,7 +95,7 @@ describe('guardas de rota', () => {
     const a = run(authGuard);
     const b = run(adminGuard);
     await Promise.resolve();
-    ctrl.expectOne('/api/auth/me').flush({ usuario: 'maria', perfil: 'Admin' });
+    ctrl.expectOne('/api/auth/me').flush({ email: 'maria@exemplo.com', perfil: 'Admin' });
     expect(await a).toBe(true);
     expect(await b).toBe(true);
     ctrl.verify();

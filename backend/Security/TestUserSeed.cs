@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 namespace backend.Security
 {
     /// <summary>
-    /// Cria um usuario de teste para desenvolvimento a partir de Seed__TestUsuario / Seed__TestSenha
+    /// Cria um usuario de teste para desenvolvimento a partir de Seed__TestEmail / Seed__TestSenha
     /// (perfil opcional em Seed__TestPerfil: "Visualizador" (padrao) ou "Admin").
     /// So roda com Seed:Enabled (ligado apenas em Development). Sem as variaveis nao faz nada:
     /// nunca ha senha padrao no codigo. Idempotente: se o usuario ja existe, nao e alterado.
@@ -20,16 +20,16 @@ namespace backend.Security
             var config = sp.GetRequiredService<IConfiguration>();
             var log = sp.GetRequiredService<ILoggerFactory>().CreateLogger("TestUserSeed");
 
-            var usuarioRaw = config["Seed:TestUsuario"];
+            var usuarioRaw = config["Seed:TestEmail"];
             var senha = config["Seed:TestSenha"];
             if (string.IsNullOrWhiteSpace(usuarioRaw) || string.IsNullOrEmpty(senha)) return;
 
-            if (!UsuarioRules.IsValid(usuarioRaw))
+            if (!EmailRules.IsValid(usuarioRaw))
             {
-                log.LogError("Seed__TestUsuario invalido (use 3-32 caracteres [a-z0-9._-]): usuario de teste nao criado.");
+                log.LogError("Seed__TestEmail invalido (use um e-mail): usuario de teste nao criado.");
                 return;
             }
-            var usuario = UsuarioRules.Normalize(usuarioRaw);
+            var usuario = EmailRules.Normalize(usuarioRaw);
 
             var perfil = config["Seed:TestPerfil"];
             if (string.IsNullOrWhiteSpace(perfil)) perfil = Roles.Viewer;
@@ -47,12 +47,12 @@ namespace backend.Security
             }
 
             var db = sp.GetRequiredService<AppDbContext>();
-            if (await db.Users.AnyAsync(u => u.Usuario == usuario)) return;
+            if (await db.Users.AnyAsync(u => u.Email == usuario)) return;
 
             var hasher = sp.GetRequiredService<Pbkdf2PasswordHasher>();
             db.Users.Add(new AppUser
             {
-                Usuario = usuario,
+                Email = usuario,
                 Role = perfil,
                 PasswordHash = await hasher.HashAsync(senha),
                 CreatedBy = "seed",

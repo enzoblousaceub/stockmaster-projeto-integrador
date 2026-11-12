@@ -3,14 +3,14 @@ export type UserStatus = 'Pendente' | 'Ativo' | 'Inativo';
 
 /** Resposta de /api/auth/login e /api/auth/me */
 export interface Me {
-  usuario: string;
+  email: string;
   perfil: Perfil;
 }
 
 /** Usuário na gestão (somente Admin) */
 export interface ManagedUser {
   id: number;
-  usuario: string;
+  email: string;
   perfil: Perfil;
   status: UserStatus;
   bloqueadoAte: string | null;
@@ -24,8 +24,11 @@ export interface ManagedUser {
 
 /** Código de ativação: exibido UMA vez */
 export interface ActivationCode {
-  codigoAtivacao: string;
+  /** ausente quando o convite foi enviado por e-mail (só o destinatário conhece o código) */
+  codigoAtivacao?: string | null;
   codigoExpiraEm: string;
+  /** true = e-mail enviado; false = falhou (o código vem junto) */
+  emailEnviado?: boolean | null;
 }
 
 export type CreatedUser = ManagedUser & ActivationCode;

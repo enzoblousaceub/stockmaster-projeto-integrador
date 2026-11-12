@@ -16,17 +16,8 @@ import { AuthService } from '../../core/auth.service';
 import { UserService } from '../../services/user.service';
 import { ManagedUser } from '../../models/auth.model';
 
-const NO_EMAIL = /e-?mail/i;
 
-/** Todo o texto visível + atributos acessíveis (aria-label, title, placeholder, alt) de um elemento. */
-function allText(el: HTMLElement): string {
-  const attrs = [...el.querySelectorAll('*')].flatMap((n) =>
-    ['aria-label', 'title', 'placeholder', 'alt', 'autocomplete', 'name', 'id'].map((a) => n.getAttribute(a) ?? '')
-  );
-  return [el.textContent ?? '', ...attrs].join(' ');
-}
-
-const me = signal<{ usuario: string; perfil: 'Admin' | 'Visualizador' } | null>({ usuario: 'maria', perfil: 'Admin' });
+const me = signal<{ email: string; perfil: 'Admin' | 'Visualizador' } | null>({ email: 'maria@exemplo.com', perfil: 'Admin' });
 
 function authMock() {
   return {
@@ -41,10 +32,10 @@ function authMock() {
 }
 
 const users: ManagedUser[] = [
-  { id: 1, usuario: 'maria', perfil: 'Admin', status: 'Ativo', bloqueadoAte: null, criadoEm: '2026-01-01T00:00:00Z', criadoPor: null, atualizadoEm: '', atualizadoPor: null, ultimoLoginEm: '2026-11-01T10:00:00Z', codigoExpiraEm: null },
-  { id: 2, usuario: 'joao', perfil: 'Visualizador', status: 'Ativo', bloqueadoAte: new Date(Date.now() + 600_000).toISOString(), criadoEm: '', criadoPor: 'maria', atualizadoEm: '', atualizadoPor: null, ultimoLoginEm: null, codigoExpiraEm: null },
-  { id: 3, usuario: 'carlos', perfil: 'Visualizador', status: 'Pendente', bloqueadoAte: null, criadoEm: '', criadoPor: 'maria', atualizadoEm: '', atualizadoPor: null, ultimoLoginEm: null, codigoExpiraEm: new Date(Date.now() + 47 * 3_600_000).toISOString() },
-  { id: 4, usuario: 'ana', perfil: 'Visualizador', status: 'Inativo', bloqueadoAte: null, criadoEm: '', criadoPor: 'maria', atualizadoEm: '', atualizadoPor: null, ultimoLoginEm: null, codigoExpiraEm: null }
+  { id: 1, email: 'maria@exemplo.com', perfil: 'Admin', status: 'Ativo', bloqueadoAte: null, criadoEm: '2026-01-01T00:00:00Z', criadoPor: null, atualizadoEm: '', atualizadoPor: null, ultimoLoginEm: '2026-11-01T10:00:00Z', codigoExpiraEm: null },
+  { id: 2, email: 'joao@exemplo.com', perfil: 'Visualizador', status: 'Ativo', bloqueadoAte: new Date(Date.now() + 600_000).toISOString(), criadoEm: '', criadoPor: 'maria', atualizadoEm: '', atualizadoPor: null, ultimoLoginEm: null, codigoExpiraEm: null },
+  { id: 3, email: 'carlos@exemplo.com', perfil: 'Visualizador', status: 'Pendente', bloqueadoAte: null, criadoEm: '', criadoPor: 'maria', atualizadoEm: '', atualizadoPor: null, ultimoLoginEm: null, codigoExpiraEm: new Date(Date.now() + 47 * 3_600_000).toISOString() },
+  { id: 4, email: 'ana@exemplo.com', perfil: 'Visualizador', status: 'Inativo', bloqueadoAte: null, criadoEm: '', criadoPor: 'maria', atualizadoEm: '', atualizadoPor: null, ultimoLoginEm: null, codigoExpiraEm: null }
 ];
 
 describe('telas de autenticação', () => {
@@ -54,7 +45,7 @@ describe('telas de autenticação', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
-    me.set({ usuario: 'maria', perfil: 'Admin' });
+    me.set({ email: 'maria@exemplo.com', perfil: 'Admin' });
     auth = authMock();
     query = convertToParamMap({});
     TestBed.configureTestingModule({
@@ -65,7 +56,7 @@ describe('telas de autenticação', () => {
         { provide: UserService, useValue: { list: vi.fn(() => of(users)), create: vi.fn(), patch: vi.fn(), reset: vi.fn(), unlock: vi.fn() } },
         { provide: MatSnackBar, useValue: { open: vi.fn() } },
         { provide: MatDialogRef, useValue: { close: vi.fn() } },
-        { provide: MAT_DIALOG_DATA, useValue: { title: 'Usuário carlos criado', usuario: 'carlos', code: 'K7QM-2XPD-9HRT', expiresAt: '2026-11-10T10:00:00Z' } },
+        { provide: MAT_DIALOG_DATA, useValue: { title: 'Usuário carlos criado', usuario: 'carlos@exemplo.com', code: 'K7QM-2XPD-9HRT', expiresAt: '2026-11-10T10:00:00Z' } },
         { provide: ActivatedRoute, useValue: { get snapshot() { return { queryParamMap: query }; } } }
       ]
     });
@@ -81,33 +72,41 @@ describe('telas de autenticação', () => {
     const f = TestBed.createComponent(LoginComponent);
     f.detectChanges();
     const el: HTMLElement = f.nativeElement;
-    expect(el.querySelector('label[for="login-usuario"]')?.textContent?.trim()).toBe('Usuário');
-    expect(el.querySelector<HTMLInputElement>('#login-usuario')?.type).toBe('text');
-    expect(allText(el)).not.toMatch(NO_EMAIL);
+    expect(el.querySelector('label[for="login-email"]')?.textContent?.trim()).toBe('E-mail');
+    expect(el.querySelector<HTMLInputElement>('#login-email')?.type).toBe('email');
+    expect(el.querySelector('#login-usuario')).toBeNull();
   });
 
-  it('ativar: usuário + código + senha, sem e-mail', () => {
+  it('ativar: e-mail + senha + confirmar senha + código', () => {
     const f = TestBed.createComponent(ActivateComponent);
     f.detectChanges();
     const el: HTMLElement = f.nativeElement;
-    expect(el.querySelector('label[for="ativar-usuario"]')?.textContent?.trim()).toBe('Usuário');
-    expect(allText(el)).not.toMatch(NO_EMAIL);
+    expect(el.querySelector('label[for="ativar-email"]')?.textContent?.trim()).toBe('E-mail');
+    expect([...el.querySelectorAll('input')].map((i) => i.id)).toEqual(['ativar-email', 'ativar-senha', 'ativar-repetir', 'ativar-codigo']);
   });
 
-  it('gestão de usuários (todos os status) não menciona e-mail', () => {
+  it('gestão de usuários lista os e-mails de todos os status', () => {
     const f = TestBed.createComponent(UsersComponent);
     f.detectChanges();
-    expect(allText(f.nativeElement)).not.toMatch(NO_EMAIL);
+    const text = (f.nativeElement as HTMLElement).textContent ?? '';
+    for (const u of users) expect(text).toContain(u.email);
   });
 
-  it('diálogo Novo usuário: só usuário e perfil (sem nome, sem senha, sem e-mail)', () => {
+  it('ativar: o link do e-mail preenche e-mail e código e limpa a URL', () => {
+    history.replaceState(null, '', '/ativar#email=ana%40exemplo.com&codigo=K7QM-2XPD-9HRT');
+    const c = TestBed.createComponent(ActivateComponent).componentInstance;
+    expect(c.email()).toBe('ana@exemplo.com');
+    expect(c.codigo()).toBe('K7QM-2XPD-9HRT');
+    expect(window.location.hash).toBe('');
+  });
+
+  it('diálogo Novo usuário: e-mail e perfil (sem senha)', () => {
     const f = TestBed.createComponent(CreateUserDialogComponent);
     f.detectChanges();
     const el: HTMLElement = f.nativeElement;
-    expect([...el.querySelectorAll('input')].map((i) => i.id)).toEqual(['new-usuario']);
+    expect([...el.querySelectorAll('input')].map((i) => i.id)).toEqual(['new-email']);
     expect(el.querySelector('select#new-perfil')).toBeTruthy();
     expect(el.querySelector('input[type="password"]')).toBeNull();
-    expect(allText(el)).not.toMatch(NO_EMAIL);
   });
 
   it('configurações > conta: usuário/perfil/senha/sair, sem e-mail e avisando "todos os dispositivos"', () => {
@@ -116,16 +115,14 @@ describe('telas de autenticação', () => {
     const el: HTMLElement = f.nativeElement;
     expect(el.textContent).toContain('maria');
     expect(el.querySelector('#btn-logout')?.textContent).toContain('todos os dispositivos');
-    expect(allText(el)).not.toMatch(NO_EMAIL);
   });
 
-  it('diálogo do código: aviso de uso único e sem e-mail', () => {
+  it('diálogo do código: aviso de uso único', () => {
     const f = TestBed.createComponent(CodeDialogComponent);
     f.detectChanges();
     const el: HTMLElement = f.nativeElement;
     expect(el.textContent).toContain('não será exibido de novo');
     expect(el.querySelector('#activation-code')?.textContent).toContain('K7QM-2XPD-9HRT');
-    expect(allText(el)).not.toMatch(NO_EMAIL);
   });
 
   it('configurações: logout com falha mantém a sessão e avisa (não finge que saiu)', () => {
@@ -149,10 +146,10 @@ describe('telas de autenticação', () => {
   // ---------- login ----------
   it('login com sucesso volta ao returnUrl seguro', () => {
     query = convertToParamMap({ returnUrl: '/products?q=abc' });
-    auth.login.mockReturnValue(of({ usuario: 'maria', perfil: 'Admin' }));
+    auth.login.mockReturnValue(of({ email: 'maria@exemplo.com', perfil: 'Admin' }));
     const f = TestBed.createComponent(LoginComponent);
     f.detectChanges();
-    f.componentInstance.usuario.set('maria');
+    f.componentInstance.email.set('maria@exemplo.com');
     f.componentInstance.senha.set('segredo123');
     f.componentInstance.submit();
     expect(router.navigateByUrl).toHaveBeenCalledWith('/products?q=abc');
@@ -160,10 +157,10 @@ describe('telas de autenticação', () => {
 
   it('login ignora returnUrl externo (open redirect)', () => {
     query = convertToParamMap({ returnUrl: 'https://evil.com' });
-    auth.login.mockReturnValue(of({ usuario: 'maria', perfil: 'Admin' }));
+    auth.login.mockReturnValue(of({ email: 'maria@exemplo.com', perfil: 'Admin' }));
     const f = TestBed.createComponent(LoginComponent);
     f.detectChanges();
-    f.componentInstance.usuario.set('maria');
+    f.componentInstance.email.set('maria@exemplo.com');
     f.componentInstance.senha.set('x');
     f.componentInstance.submit();
     expect(router.navigateByUrl).toHaveBeenCalledWith('/');
@@ -174,9 +171,9 @@ describe('telas de autenticação', () => {
     const f = TestBed.createComponent(LoginComponent);
     f.detectChanges();
     const c = f.componentInstance;
-    c.usuario.set('maria'); c.senha.set('errada');
+    c.email.set('maria@exemplo.com'); c.senha.set('errada');
     c.submit();
-    expect(c.error()).toBe('Usuário ou senha inválidos.');
+    expect(c.error()).toBe('E-mail ou senha inválidos.');
     expect(c.senha()).toBe('');
   });
 
@@ -185,7 +182,7 @@ describe('telas de autenticação', () => {
     const f = TestBed.createComponent(LoginComponent);
     f.detectChanges();
     const c = f.componentInstance;
-    c.usuario.set('maria'); c.senha.set('x');
+    c.email.set('maria@exemplo.com'); c.senha.set('x');
     c.submit();
     expect(c.wait()).toBe(3);
     expect(c.waitNote()).toContain('3 s');
@@ -213,7 +210,7 @@ describe('telas de autenticação', () => {
     const f = TestBed.createComponent(ActivateComponent);
     f.detectChanges();
     const c = f.componentInstance;
-    c.usuario.set('carlos'); c.codigo.set('K7QM-2XPD-9HRT');
+    c.email.set('carlos@exemplo.com'); c.codigo.set('K7QM-2XPD-9HRT');
 
     c.novaSenha.set('curta'); c.repetir.set('curta'); c.submit();
     expect(c.passwordError()).toContain('8 e 128');
@@ -228,9 +225,9 @@ describe('telas de autenticação', () => {
     const f = TestBed.createComponent(ActivateComponent);
     f.detectChanges();
     const c = f.componentInstance;
-    c.usuario.set('carlos'); c.codigo.set('K7QM-2XPD-9HRT'); c.novaSenha.set('senhalonga1'); c.repetir.set('senhalonga1');
+    c.email.set('carlos@exemplo.com'); c.codigo.set('K7QM-2XPD-9HRT'); c.novaSenha.set('senhalonga1'); c.repetir.set('senhalonga1');
     c.submit();
-    expect(auth.activate).toHaveBeenCalledWith('carlos', 'K7QM-2XPD-9HRT', 'senhalonga1');
+    expect(auth.activate).toHaveBeenCalledWith('carlos@exemplo.com', 'K7QM-2XPD-9HRT', 'senhalonga1');
     expect(router.navigate).toHaveBeenCalledWith(['/login'], { queryParams: { ativado: 1 } });
   });
 
@@ -239,7 +236,7 @@ describe('telas de autenticação', () => {
     const f = TestBed.createComponent(ActivateComponent);
     f.detectChanges();
     const c = f.componentInstance;
-    c.usuario.set('carlos'); c.codigo.set('K7QM-2XPD-9HRT'); c.novaSenha.set('12345678'); c.repetir.set('12345678');
+    c.email.set('carlos@exemplo.com'); c.codigo.set('K7QM-2XPD-9HRT'); c.novaSenha.set('12345678'); c.repetir.set('12345678');
     c.submit();
     expect(c.passwordError()).toContain('menos comum');
     expect(c.error()).toBe('');
@@ -253,15 +250,15 @@ describe('telas de autenticação', () => {
     const el: HTMLElement = f.nativeElement;
     const rows = [...el.querySelectorAll('tbody tr')];
     const ana = rows.find((r) => r.textContent?.includes('ana'))!;
-    expect(ana.querySelector('[aria-label="Reativar ana"]')).toBeTruthy();
+    expect(ana.querySelector('[aria-label="Reativar ana@exemplo.com"]')).toBeTruthy();
     expect(ana.querySelector('[aria-label^="Redefinir"]')).toBeNull();
     const maria = rows.find((r) => r.textContent?.includes('maria'))!;
     expect(maria.querySelector('[aria-label^="Desativar"]')).toBeNull();
     expect(maria.querySelector('button[disabled]')).toBeTruthy();
     const joao = rows.find((r) => r.textContent?.includes('joao'))!;
-    expect(joao.querySelector('[aria-label="Desbloquear joao"]')).toBeTruthy();
+    expect(joao.querySelector('[aria-label="Desbloquear joao@exemplo.com"]')).toBeTruthy();
     const carlos = rows.find((r) => r.textContent?.includes('carlos'))!;
-    expect(carlos.querySelector('[aria-label="Gerar novo código para carlos"]')).toBeTruthy();
+    expect(carlos.querySelector('[aria-label="Gerar novo código para carlos@exemplo.com"]')).toBeTruthy();
     expect(carlos.textContent).toContain('Pendente');
   });
 });

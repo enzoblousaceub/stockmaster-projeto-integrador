@@ -39,14 +39,8 @@ describe('messageFor', () => {
     }
   });
 
-  it('nunca menciona e-mail (o login é por usuário)', () => {
-    for (const code of [...KNOWN_CODES, 'inexistente']) {
-      expect(messageFor({ status: 400, code }), code).not.toMatch(/e-?mail/i);
-    }
-  });
-
-  it('login inválido não revela se o usuário existe', () => {
-    expect(messageFor({ status: 401, code: 'invalid_credentials' })).toBe('Usuário ou senha inválidos.');
+  it('login inválido não revela se o e-mail existe', () => {
+    expect(messageFor({ status: 401, code: 'invalid_credentials' })).toBe('E-mail ou senha inválidos.');
   });
 
   it('429 inclui o tempo de espera quando conhecido', () => {
@@ -54,7 +48,7 @@ describe('messageFor', () => {
   });
 
   it('validation_error mostra a primeira mensagem do campo', () => {
-    expect(messageFor({ status: 400, code: 'validation_error', errors: { usuario: ['Usuário inválido.'] } })).toBe('Usuário inválido.');
+    expect(messageFor({ status: 400, code: 'validation_error', errors: { email: ['E-mail inválido.'] } })).toBe('E-mail inválido.');
   });
 });
 

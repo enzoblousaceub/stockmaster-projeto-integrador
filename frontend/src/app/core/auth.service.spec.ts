@@ -22,7 +22,7 @@ describe('AuthService', () => {
   });
 
   const login = () => {
-    auth.user.set({ usuario: 'maria', perfil: 'Admin' });
+    auth.user.set({ email: 'maria@exemplo.com', perfil: 'Admin' });
     auth.ready.set(true);
   };
 
@@ -101,7 +101,7 @@ describe('AuthService', () => {
   });
 
   it('perfil desconhecido falha fechado (não é Admin)', () => {
-    auth.user.set({ usuario: 'x', perfil: 'Outro' as never });
+    auth.user.set({ email: 'x@exemplo.com', perfil: 'Outro' as never });
     expect(auth.canWrite()).toBe(false);
   });
 });

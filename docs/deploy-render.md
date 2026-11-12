@@ -27,7 +27,8 @@ Preencha no Blueprint (ou depois em *Site → Environment*). Nunca coloque estes
 
 | Variável | O que é |
 |---|---|
-| `Auth__AdminUsuario` | login do primeiro Admin: 3–32 caracteres `a-z 0-9 . _ -` (ex.: `admin`) |
+| `Auth__AdminEmail` | e-mail (login) do primeiro Admin. Se já existir um Admin de antes do login por e-mail, ele passa a usar este e-mail com a mesma senha |
+| `Email__ResendApiKey` / `Email__From` / `App__PublicBaseUrl` | convite por e-mail (Resend). Sem elas o Admin vê o código na tela. Pendente: domínio verificado |
 | `Auth__AdminSenha` | senha do primeiro Admin (mín. 8, não pode ser comum). Só é lida na criação; pode remover depois |
 | `Auth__CodeHmacKey` | chave base64 de 32 bytes (protege os códigos de ativação). Sem ela, criar usuário dá `503 service_misconfigured` |
 | `Auth__KeyEncryptionKey` | chave base64 de 32 bytes (cifra as chaves de sessão no banco). Sem ela o app avisa com erro no log |
@@ -47,7 +48,7 @@ Guarde as chaves em um gerenciador de senhas: girar `Auth__CodeHmacKey` invalida
 
 ## 5. Primeiro acesso
 1. Abra `https://<nome>.onrender.com` (a primeira abertura pode levar ~1 min: o plano free "acorda").
-2. Entre com `Auth__AdminUsuario` e `Auth__AdminSenha`.
+2. Entre com `Auth__AdminEmail` e `Auth__AdminSenha`.
 3. Em **Usuários**, crie a pessoa (usuário + perfil `Admin` ou `Visualizador`). A tela mostra o **código de ativação** (12 caracteres, `XXXX-XXXX-XXXX`, vale **48 h**, uso único) **uma única vez**: copie e passe à pessoa.
 4. A pessoa abre a tela de ativação, informa usuário + código + nova senha (mín. 8) e passa a entrar normalmente.
 5. Esqueceu a senha de alguém? O Admin usa **Redefinir senha**: gera novo código e invalida a senha atual. O Admin nunca vê senhas.

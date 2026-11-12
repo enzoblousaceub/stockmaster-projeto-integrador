@@ -46,7 +46,7 @@ public static class AuthTestSupport
     }
 
     public static async Task<HttpResponseMessage> LoginAsync(this HttpClient client, string usuario, string senha) =>
-        await client.PostAsJsonAsync("/api/auth/login", new { usuario, senha });
+        await client.PostAsJsonAsync("/api/auth/login", new { email = usuario, senha });
 
     /// <summary>Cliente ja autenticado como o Admin inicial (bootstrap).</summary>
     public static HttpClient CreateAdminClient(this Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> factory)
@@ -68,22 +68,30 @@ public static class AuthTestSupport
     }
 
     /// <summary>Cria um usuario pelo Admin e devolve o codigo de ativacao.</summary>
-    public static async Task<(int Id, string Code)> CreateUserAsync(this HttpClient admin, string usuario, string perfil)
+    public static async Task<(int Id, string Code)> CreateUserAsync(this HttpClient admin, ApiFactory factory, string usuario, string perfil)
     {
-        var resp = await admin.PostAsJsonAsync("/api/users", new { usuario, perfil });
+        var resp = await admin.PostAsJsonAsync("/api/users", new { email = usuario, perfil });
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
         var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
-        return (json.GetProperty("id").GetInt32(), json.GetProperty("codigoAtivacao").GetString()!);
+        // com o envio por e-mail o codigo nao vem na resposta: le-se do e-mail (fake) enviado a pessoa
+        return (json.GetProperty("id").GetInt32(), CodeSentTo(factory, usuario));
+    }
+
+    /// <summary>Codigo de ativacao do ultimo e-mail enviado a esse endereco.</summary>
+    public static string CodeSentTo(ApiFactory factory, string email)
+    {
+        var msg = factory.Email.Messages.Last(m => m.To == email);
+        return System.Text.RegularExpressions.Regex.Match(msg.Text, "[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}").Value;
     }
 
     public static async Task<HttpResponseMessage> ActivateAsync(this HttpClient client, string usuario, string codigo, string novaSenha) =>
-        await client.PostAsJsonAsync("/api/auth/ativar", new { usuario, codigo, novaSenha });
+        await client.PostAsJsonAsync("/api/auth/ativar", new { email = usuario, codigo, novaSenha });
 
     /// <summary>Cria + ativa um usuario e devolve um cliente logado como ele.</summary>
     public static async Task<HttpClient> CreateUserClientAsync(this Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> factory, HttpClient admin, string usuario,
         string perfil, string senha = "Senha-Forte-123")
     {
-        var (_, code) = await admin.CreateUserAsync(usuario, perfil);
+        var (_, code) = await admin.CreateUserAsync((ApiFactory)factory, usuario, perfil);
         var (client, _) = factory.NewSession();
         Assert.Equal(HttpStatusCode.NoContent, (await client.ActivateAsync(usuario, code, senha)).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await client.LoginAsync(usuario, senha)).StatusCode);

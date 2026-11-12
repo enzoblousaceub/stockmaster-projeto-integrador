@@ -18,7 +18,7 @@ public class AuthTests : IClassFixture<ApiFactory>
     private readonly ApiFactory _factory;
     public AuthTests(ApiFactory factory) => _factory = factory;
 
-    private static string Uniq(string prefix) => $"{prefix}{Guid.NewGuid():N}"[..14];
+    private static string Uniq(string prefix) => $"{prefix}{Guid.NewGuid():N}"[..14] + "@exemplo.com";
 
     private async Task<T> Db<T>(Func<AppDbContext, Task<T>> action, ApiFactory? factory = null)
     {
@@ -63,17 +63,17 @@ public class AuthTests : IClassFixture<ApiFactory>
     // ---------- login / sessao ----------
 
     [Fact]
-    public async Task Login_Ok_ReturnsUsuarioPerfil_AndMe()
+    public async Task Login_Ok_ReturnsEmailPerfil_AndMe()
     {
         var (client, _) = _factory.NewSession();
-        var resp = await client.LoginAsync("ADMIN", ApiFactory.AdminPassword);   // usuario case-insensitive
+        var resp = await client.LoginAsync("ADMIN@EXEMPLO.COM", ApiFactory.AdminPassword);   // usuario case-insensitive
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
         var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("admin", json.GetProperty("usuario").GetString());
+        Assert.Equal("admin@exemplo.com", json.GetProperty("email").GetString());
         Assert.Equal("Admin", json.GetProperty("perfil").GetString());
 
         var me = await client.GetFromJsonAsync<JsonElement>("/api/auth/me");
-        Assert.Equal("admin", me.GetProperty("usuario").GetString());
+        Assert.Equal("admin@exemplo.com", me.GetProperty("email").GetString());
         Assert.Equal("Admin", me.GetProperty("perfil").GetString());
     }
 
@@ -81,7 +81,7 @@ public class AuthTests : IClassFixture<ApiFactory>
     public async Task Login_InvalidCredentials_AreIndistinguishable()
     {
         var (client, _) = _factory.NewSession();
-        var wrongPassword = await client.LoginAsync("admin", "senha-errada-123");
+        var wrongPassword = await client.LoginAsync("admin@exemplo.com", "senha-errada-123");
         var unknownUser = await client.LoginAsync(Uniq("naoexiste"), "senha-errada-123");
         var pending = await client.LoginAsync(await PendingUser(), "qualquer-senha-123");
 
@@ -90,14 +90,14 @@ public class AuthTests : IClassFixture<ApiFactory>
             Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
             var p = await resp.ReadProblemAsync();
             Assert.Equal("invalid_credentials", p.Code);
-            Assert.Equal("Usuario ou senha invalidos", p.Title);
+            Assert.Equal("E-mail ou senha invalidos", p.Title);
         }
     }
 
     private async Task<string> PendingUser()
     {
         var u = Uniq("pend");
-        await _factory.CreateAdminClient().CreateUserAsync(u, "Visualizador");
+        await _factory.CreateAdminClient().CreateUserAsync(_factory, u, "Visualizador");
         return u;
     }
 
@@ -105,11 +105,11 @@ public class AuthTests : IClassFixture<ApiFactory>
     public async Task Login_InvalidFormat_Returns400ValidationError()
     {
         var (client, _) = _factory.NewSession();
-        var resp = await client.PostAsJsonAsync("/api/auth/login", new { usuario = "", senha = "" });
+        var resp = await client.PostAsJsonAsync("/api/auth/login", new { email = "", senha = "" });
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
         var p = await resp.ReadProblemAsync();
         Assert.Equal("validation_error", p.Code);
-        Assert.True(p.Raw.GetProperty("errors").TryGetProperty("usuario", out _));
+        Assert.True(p.Raw.GetProperty("errors").TryGetProperty("email", out _));
     }
 
     [Fact]
@@ -203,7 +203,7 @@ public class AuthTests : IClassFixture<ApiFactory>
     {
         var admin = _factory.CreateAdminClient();
         var user = Uniq("sep");
-        var (id, code) = await admin.CreateUserAsync(user, "Visualizador");
+        var (id, code) = await admin.CreateUserAsync(_factory, user, "Visualizador");
         var (client, _) = _factory.NewSession();
 
         for (var i = 0; i < 5; i++) await client.LoginAsync(user, "errada-errada-1");
@@ -214,7 +214,7 @@ public class AuthTests : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.TooManyRequests, (await client.LoginAsync(user, "Senha-Forte-123")).StatusCode);
 
         var list = await admin.GetFromJsonAsync<JsonElement>("/api/users");
-        var row = list.EnumerateArray().Single(u => u.GetProperty("usuario").GetString() == user);
+        var row = list.EnumerateArray().Single(u => u.GetProperty("email").GetString() == user);
         Assert.NotEqual(JsonValueKind.Null, row.GetProperty("bloqueadoAte").ValueKind);
 
         Assert.Equal(HttpStatusCode.NoContent, (await admin.PostAsync($"/api/users/{id}/desbloquear", null)).StatusCode);
@@ -226,7 +226,7 @@ public class AuthTests : IClassFixture<ApiFactory>
     {
         var admin = _factory.CreateAdminClient();
         var user = Uniq("alk");
-        var (_, code) = await admin.CreateUserAsync(user, "Visualizador");
+        var (_, code) = await admin.CreateUserAsync(_factory, user, "Visualizador");
         var (client, _) = _factory.NewSession();
 
         foreach (var target in new[] { user, Uniq("fantasma") })
@@ -286,7 +286,7 @@ public class AuthTests : IClassFixture<ApiFactory>
             await viewer.PatchAsJsonAsync("/api/products/1/quantity", new { delta = 1 }),
             await viewer.DeleteAsync("/api/products/1"),
             await viewer.GetAsync("/api/users"),
-            await viewer.PostAsJsonAsync("/api/users", new { usuario = "novo.user", perfil = "Admin" }),
+            await viewer.PostAsJsonAsync("/api/users", new { email = "novo@exemplo.com", perfil = "Admin" }),
             await viewer.GetAsync("/api/audit"),
         })
         {
@@ -334,7 +334,7 @@ public class AuthTests : IClassFixture<ApiFactory>
         await a.LoginAsync(ApiFactory.AdminUser, ApiFactory.AdminPassword);
         var (b, sessionB) = _factory.NewSession();
         var userB = Uniq("csrfb");
-        var (_, code) = await admin.CreateUserAsync(userB, "Admin");
+        var (_, code) = await admin.CreateUserAsync(_factory, userB, "Admin");
         await b.ActivateAsync(userB, code, "Senha-Forte-123");
         await b.LoginAsync(userB, "Senha-Forte-123");
 
@@ -359,7 +359,7 @@ public class AuthTests : IClassFixture<ApiFactory>
         var (client, _) = _factory.NewSession();
         var req = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login")
         {
-            Content = JsonContent.Create(new { usuario = ApiFactory.AdminUser, senha = ApiFactory.AdminPassword })
+            Content = JsonContent.Create(new { email = ApiFactory.AdminUser, senha = ApiFactory.AdminPassword })
         };
         req.Headers.Add(header, value);
         var resp = await client.SendAsync(req);
@@ -373,7 +373,7 @@ public class AuthTests : IClassFixture<ApiFactory>
         var (client, _) = _factory.NewSession();
         var req = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login")
         {
-            Content = JsonContent.Create(new { usuario = ApiFactory.AdminUser, senha = ApiFactory.AdminPassword })
+            Content = JsonContent.Create(new { email = ApiFactory.AdminUser, senha = ApiFactory.AdminPassword })
         };
         req.Headers.Add("Origin", "http://localhost");
         req.Headers.Add("Sec-Fetch-Site", "same-origin");
@@ -387,23 +387,89 @@ public class AuthTests : IClassFixture<ApiFactory>
     {
         var admin = _factory.CreateAdminClient();
         var user = Uniq("cu");
-        var resp = await admin.PostAsJsonAsync("/api/users", new { usuario = user.ToUpper(), perfil = "Visualizador" });
+        var resp = await admin.PostAsJsonAsync("/api/users", new { email = user.ToUpper(), perfil = "Visualizador" });
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
         var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal(user, json.GetProperty("usuario").GetString());
+        Assert.Equal(user, json.GetProperty("email").GetString());
         Assert.Equal("Pendente", json.GetProperty("status").GetString());
-        Assert.Matches("^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$", json.GetProperty("codigoAtivacao").GetString()!);
+        // convite enviado: o codigo vai so no e-mail, nao na resposta
+        Assert.True(json.GetProperty("emailEnviado").GetBoolean());
+        Assert.False(json.TryGetProperty("codigoAtivacao", out _));
+        var emailCode = AuthTestSupport.CodeSentTo(_factory, user);
+        Assert.Matches("^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$", emailCode);
         var expires = json.GetProperty("codigoExpiraEm").GetDateTime();
         Assert.InRange((expires - DateTime.UtcNow).TotalHours, 47.9, 48.1);
-        Assert.Equal("admin", json.GetProperty("criadoPor").GetString());
+        Assert.Equal("admin@exemplo.com", json.GetProperty("criadoPor").GetString());
 
         // o codigo nunca mais aparece, e o banco guarda so o HMAC
         var listText = await admin.GetStringAsync("/api/users");
-        Assert.DoesNotContain(json.GetProperty("codigoAtivacao").GetString()!, listText);
+        Assert.DoesNotContain(emailCode, listText);
         Assert.DoesNotContain("codigoAtivacao", listText);
-        var stored = await Db(db => db.Users.Where(u => u.Usuario == user).Select(u => u.ActivationCodeHash).SingleAsync());
+        var stored = await Db(db => db.Users.Where(u => u.Email == user).Select(u => u.ActivationCodeHash).SingleAsync());
         Assert.NotNull(stored);
-        Assert.DoesNotContain(json.GetProperty("codigoAtivacao").GetString()!.Replace("-", ""), stored);
+        Assert.DoesNotContain(emailCode.Replace("-", ""), stored);
+    }
+
+    [Fact]
+    public async Task CreateUser_InviteEmail_HasLinkWithFragmentAndActivates()
+    {
+        var admin = _factory.CreateAdminClient();
+        var user = Uniq("lnk");
+        await admin.CreateUserAsync(_factory, user, "Visualizador");
+        var msg = _factory.Email.Messages.Last(m => m.To == user);
+        var code = AuthTestSupport.CodeSentTo(_factory, user);
+        Assert.StartsWith("Segue convite para criar conta", msg.Text);
+        Assert.Contains($"https://estoque.test/ativar#email={Uri.EscapeDataString(user)}&codigo={code}", msg.Text);
+        Assert.DoesNotContain("?codigo", msg.Text);   // nunca na query string
+        var (client, _) = _factory.NewSession();
+        Assert.Equal(HttpStatusCode.NoContent, (await client.ActivateAsync(user, code, "Senha-Forte-123")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.LoginAsync(user.ToUpper(), "Senha-Forte-123")).StatusCode);   // e-mail sem diferenciar caixa
+    }
+
+    [Fact]
+    public async Task CreateUser_EmailFailure_FallsBackToShowingCodeToAdmin()
+    {
+        using var factory = new ApiFactory();
+        factory.Email.Succeed = false;
+        var admin = factory.CreateAdminClient();
+        var resp = await admin.PostAsJsonAsync("/api/users", new { email = "falha@exemplo.com", perfil = "Visualizador" });
+        Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
+        var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.False(json.GetProperty("emailEnviado").GetBoolean());
+        Assert.Matches("^[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}$", json.GetProperty("codigoAtivacao").GetString()!);
+    }
+
+    [Fact]
+    public async Task CreateUser_DuplicateEmail_IgnoresCase_AndInvalidEmailsAreRejected()
+    {
+        var admin = _factory.CreateAdminClient();
+        var user = Uniq("dupc");
+        await admin.CreateUserAsync(_factory, user, "Visualizador");
+        var dup = await admin.PostAsJsonAsync("/api/users", new { email = user.ToUpper(), perfil = "Visualizador" });
+        Assert.Equal(HttpStatusCode.Conflict, dup.StatusCode);
+        foreach (var bad in new[] { "", "sem-arroba", "a@", "a@b", "a b@x.com" })
+            Assert.Equal(HttpStatusCode.BadRequest, (await admin.PostAsJsonAsync("/api/users", new { email = bad, perfil = "Visualizador" })).StatusCode);
+    }
+
+    [Fact]
+    public async Task Patch_Email_OnlyWhilePending_ReissuesCodeToNewAddress()
+    {
+        var admin = _factory.CreateAdminClient();
+        var user = Uniq("ed");
+        var (id, oldCode) = await admin.CreateUserAsync(_factory, user, "Visualizador");
+        var novo = Uniq("ednew");
+        var resp = await admin.PatchAsJsonAsync($"/api/users/{id}", new { email = novo });
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var newCode = AuthTestSupport.CodeSentTo(_factory, novo);
+        Assert.NotEqual(oldCode, newCode);
+        var (client, _) = _factory.NewSession();
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.ActivateAsync(user, oldCode, "Senha-Forte-123")).StatusCode);   // endereco antigo morreu
+        Assert.Equal(HttpStatusCode.NoContent, (await client.ActivateAsync(novo, newCode, "Senha-Forte-123")).StatusCode);
+
+        // depois de ativar, o e-mail trava
+        var locked = await admin.PatchAsJsonAsync($"/api/users/{id}", new { email = Uniq("ed2") });
+        Assert.Equal(HttpStatusCode.Conflict, locked.StatusCode);
+        Assert.Equal("email_locked", (await locked.ReadProblemAsync()).Code);
     }
 
     [Fact]
@@ -411,15 +477,15 @@ public class AuthTests : IClassFixture<ApiFactory>
     {
         var admin = _factory.CreateAdminClient();
         var user = Uniq("dup");
-        await admin.CreateUserAsync(user, "Visualizador");
+        await admin.CreateUserAsync(_factory, user, "Visualizador");
 
-        var dup = await admin.PostAsJsonAsync("/api/users", new { usuario = user, perfil = "Visualizador" });
+        var dup = await admin.PostAsJsonAsync("/api/users", new { email = user, perfil = "Visualizador" });
         Assert.Equal(HttpStatusCode.Conflict, dup.StatusCode);
-        Assert.Equal("usuario_exists", (await dup.ReadProblemAsync()).Code);
+        Assert.Equal("email_exists", (await dup.ReadProblemAsync()).Code);
 
-        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PostAsJsonAsync("/api/users", new { usuario = "a b", perfil = "Admin" })).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PostAsJsonAsync("/api/users", new { usuario = "ok.user", perfil = "admin" })).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PostAsJsonAsync("/api/users", new { usuario = "ok.user", perfil = "Viewer" })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PostAsJsonAsync("/api/users", new { email = "a b@x", perfil = "Admin" })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PostAsJsonAsync("/api/users", new { email = "ok@exemplo.com", perfil = "admin" })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PostAsJsonAsync("/api/users", new { email = "ok@exemplo.com", perfil = "Viewer" })).StatusCode);
     }
 
     [Fact]
@@ -427,7 +493,7 @@ public class AuthTests : IClassFixture<ApiFactory>
     {
         var admin = _factory.CreateAdminClient();
         var user = Uniq("flow");
-        var (_, code) = await admin.CreateUserAsync(user, "Visualizador");
+        var (_, code) = await admin.CreateUserAsync(_factory, user, "Visualizador");
         var (client, _) = _factory.NewSession();
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.LoginAsync(user, "Senha-Forte-123")).StatusCode);   // pendente
@@ -436,7 +502,7 @@ public class AuthTests : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.OK, (await client.LoginAsync(user, "Senha-Forte-123")).StatusCode);
 
         var list = await admin.GetFromJsonAsync<JsonElement>("/api/users");
-        var row = list.EnumerateArray().Single(u => u.GetProperty("usuario").GetString() == user);
+        var row = list.EnumerateArray().Single(u => u.GetProperty("email").GetString() == user);
         Assert.Equal("Ativo", row.GetProperty("status").GetString());
         Assert.NotEqual(JsonValueKind.Null, row.GetProperty("ultimoLoginEm").ValueKind);
     }
@@ -446,7 +512,7 @@ public class AuthTests : IClassFixture<ApiFactory>
     {
         var admin = _factory.CreateAdminClient();
         var user = Uniq("pw");
-        var (_, code) = await admin.CreateUserAsync(user, "Visualizador");
+        var (_, code) = await admin.CreateUserAsync(_factory, user, "Visualizador");
         var (client, _) = _factory.NewSession();
 
         var tooShort = await client.ActivateAsync(user, code, "curta");
@@ -472,7 +538,7 @@ public class AuthTests : IClassFixture<ApiFactory>
     {
         var admin = _factory.CreateAdminClient();
         var user = Uniq("ce");
-        var (_, code) = await admin.CreateUserAsync(user, "Visualizador");
+        var (_, code) = await admin.CreateUserAsync(_factory, user, "Visualizador");
         var (client, _) = _factory.NewSession();
 
         var wrong = await client.ActivateAsync(user, "AAAA-BBBB-CCCC", "Senha-Forte-123");
@@ -488,10 +554,10 @@ public class AuthTests : IClassFixture<ApiFactory>
 
         // expirado (so e revelado porque o codigo confere)
         var expiredUser = Uniq("ex");
-        var (_, expiredCode) = await admin.CreateUserAsync(expiredUser, "Visualizador");
+        var (_, expiredCode) = await admin.CreateUserAsync(_factory, expiredUser, "Visualizador");
         await Db(async db =>
         {
-            await db.Users.Where(u => u.Usuario == expiredUser)
+            await db.Users.Where(u => u.Email == expiredUser)
                 .ExecuteUpdateAsync(s => s.SetProperty(u => u.ActivationExpiresAt, DateTime.UtcNow.AddMinutes(-1)));
             return 0;
         });
@@ -513,7 +579,7 @@ public class AuthTests : IClassFixture<ApiFactory>
     {
         var admin = _factory.CreateAdminClient();
         var user = Uniq("race");
-        var (_, code) = await admin.CreateUserAsync(user, "Visualizador");
+        var (_, code) = await admin.CreateUserAsync(_factory, user, "Visualizador");
         var (client, _) = _factory.NewSession();
 
         var results = await Task.WhenAll(Enumerable.Range(0, 6)
@@ -528,12 +594,13 @@ public class AuthTests : IClassFixture<ApiFactory>
         var admin = _factory.CreateAdminClient();
         var user = Uniq("rs");
         var session = await _factory.CreateUserClientAsync(admin, user, "Visualizador");
-        var id = (await Db(db => db.Users.Where(u => u.Usuario == user).Select(u => u.Id).SingleAsync()));
+        var id = (await Db(db => db.Users.Where(u => u.Email == user).Select(u => u.Id).SingleAsync()));
 
         var resp = await admin.PostAsync($"/api/users/{id}/reset", null);
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
         var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
-        var newCode = json.GetProperty("codigoAtivacao").GetString()!;
+        Assert.True(json.GetProperty("emailEnviado").GetBoolean());
+        var newCode = AuthTestSupport.CodeSentTo(_factory, user);
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await session.GetAsync("/api/auth/me")).StatusCode);   // sessao caiu
         var (client, _) = _factory.NewSession();
@@ -550,7 +617,7 @@ public class AuthTests : IClassFixture<ApiFactory>
         var admin = _factory.CreateAdminClient();
         var user = Uniq("pt");
         var session = await _factory.CreateUserClientAsync(admin, user, "Visualizador");
-        var id = await Db(db => db.Users.Where(u => u.Usuario == user).Select(u => u.Id).SingleAsync());
+        var id = await Db(db => db.Users.Where(u => u.Email == user).Select(u => u.Id).SingleAsync());
 
         var off = await admin.PatchAsJsonAsync($"/api/users/{id}", new { ativo = false });
         Assert.Equal(HttpStatusCode.OK, off.StatusCode);
@@ -582,12 +649,13 @@ public class AuthTests : IClassFixture<ApiFactory>
     {
         var admin = _factory.CreateAdminClient();
         var user = Uniq("pr");
-        var (id, oldCode) = await admin.CreateUserAsync(user, "Visualizador");
+        var (id, oldCode) = await admin.CreateUserAsync(_factory, user, "Visualizador");
         await admin.PatchAsJsonAsync($"/api/users/{id}", new { ativo = false });
         var on = await admin.PatchAsJsonAsync($"/api/users/{id}", new { ativo = true });
         var json = await on.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("Pendente", json.GetProperty("status").GetString());
-        var newCode = json.GetProperty("codigoAtivacao").GetString()!;
+        Assert.True(json.GetProperty("emailEnviado").GetBoolean());
+        var newCode = AuthTestSupport.CodeSentTo(_factory, user);
         Assert.NotEqual(oldCode, newCode);
 
         var (client, _) = _factory.NewSession();
@@ -601,7 +669,7 @@ public class AuthTests : IClassFixture<ApiFactory>
         var admin = _factory.CreateAdminClient();
         var user = Uniq("pf");
         var session = await _factory.CreateUserClientAsync(admin, user, "Visualizador");
-        var id = await Db(db => db.Users.Where(u => u.Usuario == user).Select(u => u.Id).SingleAsync());
+        var id = await Db(db => db.Users.Where(u => u.Email == user).Select(u => u.Id).SingleAsync());
 
         // campo desconhecido, perfil fora do enum (case-sensitive), corpo vazio
         var unknown = await admin.PatchAsJsonAsync($"/api/users/{id}", new { perfil = "Admin", senha = "x" });
@@ -624,7 +692,7 @@ public class AuthTests : IClassFixture<ApiFactory>
         // fabrica propria: banco proprio com exatamente um Admin
         using var factory = new ApiFactory();
         var admin = factory.CreateAdminClient();
-        var adminId = await Db(db => db.Users.Where(u => u.Usuario == ApiFactory.AdminUser).Select(u => u.Id).SingleAsync(), factory);
+        var adminId = await Db(db => db.Users.Where(u => u.Email == ApiFactory.AdminUser).Select(u => u.Id).SingleAsync(), factory);
 
         foreach (var resp in new[]
         {
@@ -639,7 +707,7 @@ public class AuthTests : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync("/api/auth/me")).StatusCode);
 
         // com um segundo Admin ativo, o primeiro pode ser rebaixado
-        await factory.CreateUserClientAsync(admin, "segundo.admin", "Admin");
+        await factory.CreateUserClientAsync(admin, "segundo.admin@exemplo.com", "Admin");
         Assert.Equal(HttpStatusCode.OK, (await admin.PatchAsJsonAsync($"/api/users/{adminId}", new { perfil = "Visualizador" })).StatusCode);
     }
 
@@ -680,7 +748,7 @@ public class AuthTests : IClassFixture<ApiFactory>
     {
         var admin = _factory.CreateAdminClient();
         var user = Uniq("au");
-        var (id, code) = await admin.CreateUserAsync(user, "Visualizador");
+        var (id, code) = await admin.CreateUserAsync(_factory, user, "Visualizador");
         var (client, _) = _factory.NewSession();
         await client.LoginAsync(user, "senha-que-nao-vale");
         await client.ActivateAsync(user, code, "Senha-Super-Secreta-789");
@@ -697,7 +765,7 @@ public class AuthTests : IClassFixture<ApiFactory>
 
         var rows = JsonDocument.Parse(text).RootElement.EnumerateArray().ToList();
         var created = rows.First(r => r.GetProperty("evento").GetString() == "usuario_criado" && r.GetProperty("alvoUsuario").GetString() == user);
-        Assert.Equal("admin", created.GetProperty("atorUsuario").GetString());
+        Assert.Equal("admin@exemplo.com", created.GetProperty("atorUsuario").GetString());
         Assert.Equal("ok", created.GetProperty("resultado").GetString());
 
         Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync("/api/audit?limite=9999")).StatusCode);   // limite e ajustado, nao erro
@@ -749,7 +817,7 @@ public class AuthTests : IClassFixture<ApiFactory>
         var (client, _) = factory.NewSession();
         Assert.Equal(HttpStatusCode.OK, (await client.LoginAsync(user, "Senha-Forte-123")).StatusCode);
 
-        var hash = await Db(db => db.Users.Where(u => u.Usuario == user).Select(u => u.PasswordHash).SingleAsync());
+        var hash = await Db(db => db.Users.Where(u => u.Email == user).Select(u => u.PasswordHash).SingleAsync());
         Assert.StartsWith("pbkdf2-sha512$2000$", hash);
         Assert.Equal(HttpStatusCode.OK, (await client.LoginAsync(user, "Senha-Forte-123")).StatusCode);
     }
@@ -791,11 +859,33 @@ public class AuthTests : IClassFixture<ApiFactory>
 public class AdminBootstrapTests
 {
     [Fact]
+    public async Task LegacyAdminWithoutEmail_GetsAdminEmail_KeepingPassword()
+    {
+        using var factory = new ApiFactory();
+        _ = factory.CreateClient();   // sobe o app (cria o Admin com e-mail)
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            // simula a conta antiga: so um nome no lugar do e-mail
+            await db.Users.Where(u => u.Email == ApiFactory.AdminUser).ExecuteUpdateAsync(s => s.SetProperty(u => u.Email, "admin"));
+        }
+        var (c1, _) = factory.NewSession();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await c1.LoginAsync(ApiFactory.AdminUser, ApiFactory.AdminPassword)).StatusCode);
+
+        await backend.Security.AdminBootstrap.RunAsync(factory.Services);   // reinicio com Auth__AdminEmail definido
+
+        var (c2, _) = factory.NewSession();
+        Assert.Equal(HttpStatusCode.OK, (await c2.LoginAsync(ApiFactory.AdminUser, ApiFactory.AdminPassword)).StatusCode);   // mesma senha
+        using var scope2 = factory.Services.CreateScope();
+        Assert.Equal(1, await scope2.ServiceProvider.GetRequiredService<AppDbContext>().Users.CountAsync());
+    }
+
+    [Fact]
     public async Task WithoutEnvVars_NoAdminIsCreated_AndNoDefaultPassword()
     {
         using var factory = new NoAdminFactory();
         var (client, _) = factory.NewSession();
-        Assert.Equal(HttpStatusCode.Unauthorized, (await client.LoginAsync("admin", ApiFactory.AdminPassword)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.LoginAsync("admin@exemplo.com", ApiFactory.AdminPassword)).StatusCode);
         using var scope = factory.Services.CreateScope();
         Assert.Equal(0, await scope.ServiceProvider.GetRequiredService<AppDbContext>().Users.CountAsync());
     }
@@ -823,7 +913,7 @@ public class AdminBootstrapTests
     {
         using var factory = new NoAdminFactory().WithWebHostBuilder(b =>
         {
-            b.UseSetting("Auth:AdminUsuario", "admin");
+            b.UseSetting("Auth:AdminEmail", "admin@exemplo.com");
             b.UseSetting("Auth:AdminSenha", "12345678");
         });
         _ = factory.CreateClient();
@@ -836,7 +926,7 @@ public class AdminBootstrapTests
     {
         using var factory = new NoHmacKeyFactory();
         var admin = factory.CreateAdminClient();
-        var resp = await admin.PostAsJsonAsync("/api/users", new { usuario = "novo.user", perfil = "Visualizador" });
+        var resp = await admin.PostAsJsonAsync("/api/users", new { email = "novo@exemplo.com", perfil = "Visualizador" });
         Assert.Equal(HttpStatusCode.ServiceUnavailable, resp.StatusCode);
         Assert.Equal("service_misconfigured", (await resp.ReadProblemAsync()).Code);
     }
@@ -844,14 +934,14 @@ public class AdminBootstrapTests
 
 public class TestUserSeedTests
 {
-    private const string TestUser = "teste";
+    private const string TestUser = "teste@exemplo.com";
     private const string TestPassword = "Teste-Seed-123";
 
     private static WebApplicationFactory<Program> WithTestUser(ApiFactory factory, string? perfil = null, string seedEnabled = "true") =>
         factory.WithWebHostBuilder(b =>
         {
             b.UseSetting("Seed:Enabled", seedEnabled);
-            b.UseSetting("Seed:TestUsuario", TestUser);
+            b.UseSetting("Seed:TestEmail", TestUser);
             b.UseSetting("Seed:TestSenha", TestPassword);
             if (perfil is not null) b.UseSetting("Seed:TestPerfil", perfil);
         });
@@ -864,7 +954,7 @@ public class TestUserSeedTests
         var client = factory.CreateClient(new() { HandleCookies = true });
         Assert.Equal(HttpStatusCode.OK, (await client.LoginAsync(TestUser, TestPassword)).StatusCode);
         using var scope = factory.Services.CreateScope();
-        var user = await scope.ServiceProvider.GetRequiredService<AppDbContext>().Users.SingleAsync(u => u.Usuario == TestUser);
+        var user = await scope.ServiceProvider.GetRequiredService<AppDbContext>().Users.SingleAsync(u => u.Email == TestUser);
         Assert.Equal(Roles.Viewer, user.Role);
     }
 
@@ -875,7 +965,7 @@ public class TestUserSeedTests
         using var factory = WithTestUser(baseFactory, Roles.Admin);
         _ = factory.CreateClient();
         using var scope = factory.Services.CreateScope();
-        var user = await scope.ServiceProvider.GetRequiredService<AppDbContext>().Users.SingleAsync(u => u.Usuario == TestUser);
+        var user = await scope.ServiceProvider.GetRequiredService<AppDbContext>().Users.SingleAsync(u => u.Email == TestUser);
         Assert.Equal(Roles.Admin, user.Role);
     }
 
@@ -886,7 +976,7 @@ public class TestUserSeedTests
         using var factory = WithTestUser(baseFactory, seedEnabled: "false");
         _ = factory.CreateClient();
         using var scope = factory.Services.CreateScope();
-        Assert.False(await scope.ServiceProvider.GetRequiredService<AppDbContext>().Users.AnyAsync(u => u.Usuario == TestUser));
+        Assert.False(await scope.ServiceProvider.GetRequiredService<AppDbContext>().Users.AnyAsync(u => u.Email == TestUser));
     }
 
     [Fact]

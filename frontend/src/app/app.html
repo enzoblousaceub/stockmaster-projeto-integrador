@@ -27,9 +27,9 @@
       </form>
       <span class="topbar-spacer"></span>
       <button type="button" class="user-chip" (click)="openSettings()" aria-haspopup="dialog"
-        [attr.aria-label]="'Conta de ' + auth.user()?.usuario + ' (' + auth.user()?.perfil + '). Abrir configurações'">
+        [attr.aria-label]="'Conta de ' + auth.user()?.email + ' (' + auth.user()?.perfil + '). Abrir configurações'">
         <span class="avatar" aria-hidden="true">{{ initials() }}</span>
-        <span class="user-txt"><b>{{ auth.user()?.usuario }}</b><small>{{ auth.user()?.perfil }}</small></span>
+        <span class="user-txt"><b>{{ auth.user()?.email }}</b><small>{{ auth.user()?.perfil }}</small></span>
       </button>
       <button type="button" class="icon-btn logout-btn--top" (click)="logout()" id="btn-logout-top"
         aria-label="Sair (encerra a sessão em todos os dispositivos)" title="Sair de todos os dispositivos">

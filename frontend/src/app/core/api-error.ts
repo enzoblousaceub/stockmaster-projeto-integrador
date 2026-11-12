@@ -27,7 +27,7 @@ export function formatWait(seconds: number): string {
 export function messageFor(p: ApiProblem): string {
   const wait = p.retryAfterSeconds ? ` Tente novamente em ${formatWait(p.retryAfterSeconds)}.` : '';
   switch (p.code) {
-    case 'invalid_credentials': return 'Usuário ou senha inválidos.';
+    case 'invalid_credentials': return 'E-mail ou senha inválidos.';
     case 'account_locked': return `Muitas tentativas seguidas; o acesso foi bloqueado temporariamente.${wait}`;
     case 'rate_limited': return `Muitas tentativas em pouco tempo.${wait || ' Aguarde um instante.'}`;
     case 'validation_error': {
@@ -36,11 +36,12 @@ export function messageFor(p: ApiProblem): string {
     }
     case 'current_password_invalid': return 'A senha atual está incorreta.';
     case 'password_too_short': return 'A senha deve ter entre 8 e 128 caracteres.';
-    case 'password_weak': return 'Escolha uma senha menos comum: não use o próprio usuário nem caracteres repetidos.';
-    case 'activation_code_invalid': return 'Código de ativação inválido. Confira o usuário e o código.';
+    case 'password_weak': return 'Escolha uma senha menos comum: não use o próprio e-mail nem caracteres repetidos.';
+    case 'activation_code_invalid': return 'Código de ativação inválido. Confira o e-mail e o código.';
     case 'activation_code_expired': return 'Este código expirou. Peça um novo código ao administrador.';
     case 'activation_code_used': return 'Este código já foi utilizado. Entre com a sua senha ou peça um novo código ao administrador.';
-    case 'usuario_exists': return 'Já existe um usuário com este nome.';
+    case 'email_exists': return 'Já existe um usuário com este e-mail.';
+    case 'email_locked': return 'O e-mail só pode ser alterado enquanto a pessoa não ativou o acesso.';
     case 'user_inactive': return 'Usuário inativo. Reative-o antes de redefinir o acesso.';
     case 'last_admin': return 'Não é possível desativar, rebaixar ou redefinir o último administrador ativo.';
     case 'forbidden': return 'Você não tem permissão para esta ação.';
@@ -56,7 +57,7 @@ export function messageFor(p: ApiProblem): string {
 export const KNOWN_CODES = [
   'invalid_credentials', 'account_locked', 'rate_limited', 'validation_error', 'current_password_invalid',
   'password_too_short', 'password_weak', 'activation_code_invalid', 'activation_code_expired',
-  'activation_code_used', 'usuario_exists', 'user_inactive', 'last_admin', 'forbidden', 'csrf_invalid',
+  'activation_code_used', 'email_exists', 'email_locked', 'user_inactive', 'last_admin', 'forbidden', 'csrf_invalid',
   'service_misconfigured', 'unauthenticated', 'network'
 ] as const;
 

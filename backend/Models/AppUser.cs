@@ -17,8 +17,8 @@ namespace backend.Models
     public class AppUser
     {
         public int Id { get; set; }
-        /// <summary>Login, sempre em minusculas (unico). 3-32 chars [a-z0-9._-].</summary>
-        public string Usuario { get; set; } = string.Empty;
+        /// <summary>E-mail = identidade de login e destino do convite. Sempre em minusculas e unico.</summary>
+        public string Email { get; set; } = string.Empty;
         /// <summary>Nulo enquanto o usuario esta Pendente (sem senha definida).</summary>
         public string? PasswordHash { get; set; }
         public string Role { get; set; } = Roles.Viewer;

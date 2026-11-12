@@ -13,12 +13,12 @@ export class UserService {
     return this.http.get<ManagedUser[]>(this.url);
   }
 
-  create(usuario: string, perfil: Perfil): Observable<CreatedUser> {
-    return this.http.post<CreatedUser>(this.url, { usuario, perfil });
+  create(email: string, perfil: Perfil): Observable<CreatedUser> {
+    return this.http.post<CreatedUser>(this.url, { email, perfil });
   }
 
   /** perfil e/ou ativo; reativar um Pendente sem senha devolve também um novo código. */
-  patch(id: number, body: { perfil?: Perfil; ativo?: boolean }): Observable<PatchedUser> {
+  patch(id: number, body: { perfil?: Perfil; ativo?: boolean; email?: string }): Observable<PatchedUser> {
     return this.http.patch<PatchedUser>(`${this.url}/${id}`, body);
   }
 

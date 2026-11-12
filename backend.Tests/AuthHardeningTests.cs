@@ -16,7 +16,7 @@ public class AuthHardeningTests : IClassFixture<ApiFactory>
     private readonly ApiFactory _factory;
     public AuthHardeningTests(ApiFactory factory) => _factory = factory;
 
-    private static string Uniq(string prefix) => $"{prefix}{Guid.NewGuid():N}"[..14];
+    private static string Uniq(string prefix) => $"{prefix}{Guid.NewGuid():N}"[..14] + "@exemplo.com";
 
     private async Task<T> Db<T>(Func<AppDbContext, Task<T>> action, Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program>? f = null)
     {
@@ -72,12 +72,12 @@ public class AuthHardeningTests : IClassFixture<ApiFactory>
     {
         var admin = _factory.CreateAdminClient();
         var user = Uniq("ba");
-        await admin.CreateUserAsync(user, "Visualizador");
+        await admin.CreateUserAsync(_factory, user, "Visualizador");
         var (client, _) = _factory.NewSession();
         for (var i = 0; i < 5; i++) await client.ActivateAsync(user, "AAAA-BBBB-CCCC", "Senha-Forte-123");
 
         var list = await admin.GetFromJsonAsync<JsonElement>("/api/users");
-        var row = list.EnumerateArray().Single(u => u.GetProperty("usuario").GetString() == user);
+        var row = list.EnumerateArray().Single(u => u.GetProperty("email").GetString() == user);
         Assert.NotEqual(JsonValueKind.Null, row.GetProperty("bloqueadoAte").ValueKind);
     }
 
@@ -121,9 +121,9 @@ public class AuthHardeningTests : IClassFixture<ApiFactory>
     {
         using var factory = new ApiFactory();
         var first = factory.CreateAdminClient();
-        var second = await factory.CreateUserClientAsync(first, "admin.dois", "Admin");
-        var firstId = await Db(db => db.Users.Where(u => u.Usuario == "admin").Select(u => u.Id).SingleAsync(), factory);
-        var secondId = await Db(db => db.Users.Where(u => u.Usuario == "admin.dois").Select(u => u.Id).SingleAsync(), factory);
+        var second = await factory.CreateUserClientAsync(first, "admin.dois@exemplo.com", "Admin");
+        var firstId = await Db(db => db.Users.Where(u => u.Email == "admin@exemplo.com").Select(u => u.Id).SingleAsync(), factory);
+        var secondId = await Db(db => db.Users.Where(u => u.Email == "admin.dois@exemplo.com").Select(u => u.Id).SingleAsync(), factory);
 
         var results = await Task.WhenAll(
             first.PatchAsJsonAsync($"/api/users/{secondId}", new { perfil = "Visualizador" }),

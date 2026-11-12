@@ -10,7 +10,7 @@ const PUBLIC = () => new HttpContext().set(PUBLIC_AUTH, true);
 /** Resposta de /me só vale com o formato do contrato (um HTML 200 de proxy/fallback não é sessão). */
 function isMe(v: unknown): v is Me {
   const m = v as Partial<Me> | null;
-  return !!m && typeof m.usuario === 'string' && (m.perfil === 'Admin' || m.perfil === 'Visualizador');
+  return !!m && typeof m.email === 'string' && (m.perfil === 'Admin' || m.perfil === 'Visualizador');
 }
 
 @Injectable({ providedIn: 'root' })
@@ -90,9 +90,9 @@ export class AuthService {
     return this.http.get<Me>('/api/auth/me').pipe(tap((me) => this.user.set(me)));
   }
 
-  login(usuario: string, senha: string): Observable<Me> {
+  login(email: string, senha: string): Observable<Me> {
     return this.http
-      .post<Me>('/api/auth/login', { usuario, senha }, { context: PUBLIC() })
+      .post<Me>('/api/auth/login', { email, senha }, { context: PUBLIC() })
       .pipe(tap((me) => { this.user.set(me); this.ready.set(true); }));
   }
 
@@ -109,8 +109,8 @@ export class AuthService {
     return this.http.post<void>('/api/auth/senha', { senhaAtual, novaSenha });
   }
 
-  activate(usuario: string, codigo: string, novaSenha: string): Observable<void> {
-    return this.http.post<void>('/api/auth/ativar', { usuario, codigo, novaSenha }, { context: PUBLIC() });
+  activate(email: string, codigo: string, novaSenha: string): Observable<void> {
+    return this.http.post<void>('/api/auth/ativar', { email, codigo, novaSenha }, { context: PUBLIC() });
   }
 
   clear(): void {
