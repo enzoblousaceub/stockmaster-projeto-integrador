@@ -258,10 +258,13 @@ namespace backend.Controllers
             return Ok(product);
         }
 
+        /// <summary>400 no mesmo formato da validacao automatica (ProblemDetails com code "validation_error").</summary>
         private ActionResult FileError(string message)
         {
             ModelState.AddModelError("file", message);
-            return ValidationProblem();
+            var pd = ProblemDetailsFactory.CreateValidationProblemDetails(HttpContext, ModelState);
+            pd.Extensions["code"] = "validation_error";
+            return new BadRequestObjectResult(pd) { ContentTypes = { "application/problem+json" } };
         }
 
         // DELETE: api/products/5/image

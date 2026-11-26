@@ -63,7 +63,8 @@ public class ErrorHandlingTests : IClassFixture<ApiFactory>
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            await db.Database.ExecuteSqlRawAsync("DROP TABLE \"Products\"");
+            // CASCADE: movimentacoes e imagens tem FK para Products
+            await db.Database.ExecuteSqlRawAsync("DROP TABLE \"Products\" CASCADE");
         }
 
         var resp = await factory.CreateAdminClient().GetAsync("/api/products");
