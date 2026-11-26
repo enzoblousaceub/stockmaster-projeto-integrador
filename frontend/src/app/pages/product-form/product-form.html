@@ -42,7 +42,7 @@
 
       <fieldset class="section" [disabled]="loading && isEditMode">
         <legend>Preço e estoque</legend>
-        <div class="grid grid-3">
+        <div class="grid grid-2">
           <mat-form-field appearance="fill" subscriptSizing="dynamic">
             <mat-label>Preço (R$)</mat-label>
             <input matInput type="number" inputmode="decimal" step="0.01" min="0" formControlName="price"
@@ -54,9 +54,21 @@
           </mat-form-field>
 
           <mat-form-field appearance="fill" subscriptSizing="dynamic">
-            <mat-label>Quantidade</mat-label>
+            <mat-label>Custo (R$)</mat-label>
+            <input matInput type="number" inputmode="decimal" step="0.01" min="0" formControlName="cost"
+              id="input-cost" enterkeyhint="next" required>
+            <mat-hint>Quanto você paga por unidade</mat-hint>
+            @if (form.get('cost')?.hasError('required')) { <mat-error>Informe o custo (0 se não souber)</mat-error> }
+            @if (form.get('cost')?.hasError('min')) { <mat-error>O custo não pode ser negativo</mat-error> }
+            @if (form.get('cost')?.hasError('max')) { <mat-error>Valor acima do permitido</mat-error> }
+            @if (form.get('cost')?.hasError('decimals')) { <mat-error>Use no máximo 2 casas decimais</mat-error> }
+          </mat-form-field>
+
+          <mat-form-field appearance="fill" subscriptSizing="dynamic">
+            <mat-label>{{ isEditMode ? 'Quantidade em estoque' : 'Quantidade inicial' }}</mat-label>
             <input matInput type="number" inputmode="numeric" step="1" min="0" formControlName="quantity"
               id="input-quantity" enterkeyhint="next" required>
+            @if (isEditMode) { <mat-hint>Para mudar, use "Movimentar" na ficha do produto</mat-hint> }
             @if (form.get('quantity')?.hasError('required')) { <mat-error>Informe a quantidade</mat-error> }
             @if (form.get('quantity')?.hasError('min')) { <mat-error>A quantidade não pode ser negativa</mat-error> }
             @if (form.get('quantity')?.hasError('max')) { <mat-error>Valor acima do permitido</mat-error> }
@@ -73,6 +85,28 @@
           </mat-form-field>
         </div>
       </fieldset>
+
+      <fieldset class="section">
+        <legend>Imagem</legend>
+        <div class="img-row">
+          <div class="img-box">
+            @if (imagePreview) { <img [src]="imagePreview" alt="Imagem do produto" width="96" height="96"> }
+            @else { <mat-icon aria-hidden="true">image</mat-icon> }
+          </div>
+          <div class="img-acts">
+            <label class="btn btn-outline" for="input-image">
+              <mat-icon aria-hidden="true">upload</mat-icon><span>{{ imagePreview ? 'Trocar imagem' : 'Escolher imagem' }}</span>
+            </label>
+            <input #img id="input-image" class="sr-only" type="file" accept="image/jpeg,image/png,image/webp" (change)="onImageSelected(img)">
+            @if (imagePreview) {
+              <button type="button" class="btn btn-outline" (click)="clearImage()" id="btn-remove-image">
+                <mat-icon aria-hidden="true">delete</mat-icon><span>Remover</span>
+              </button>
+            }
+            <span class="img-hint" [class.img-err]="imageError" role="status">{{ imageError || 'JPEG, PNG ou WebP, até 2 MB' }}</span>
+          </div>
+        </div>
+      </fieldset>
     </form>
 
     <aside class="preview" [class.collapsed]="!previewOpen" aria-label="Pré-visualização do produto">
@@ -83,10 +117,14 @@
       </button>
       <h2 class="preview-title">Pré-visualização</h2>
       <div class="preview-card" id="preview-card">
+        @if (imagePreview) { <img class="preview-img" [src]="imagePreview" alt="" width="64" height="64"> }
         <div class="preview-info">
           <span class="preview-name">{{ form.get('name')?.value || 'Nome do produto' }}</span>
           <span class="preview-category">{{ form.get('category')?.value || 'Categoria' }}</span>
           <span class="preview-price num">{{ (form.get('price')?.value || 0) | currency: 'BRL' : 'symbol' : '1.2-2' }}</span>
+          @if (form.get('price')?.value > 0) {
+            <span class="preview-margin">Margem {{ ((form.get('price')?.value - (form.get('cost')?.value || 0)) / form.get('price')?.value) | percent: '1.0-1' }}</span>
+          }
         </div>
       </div>
     </aside>

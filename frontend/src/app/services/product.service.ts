@@ -1,13 +1,13 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, timeout } from 'rxjs';
-import { Product, CreateProduct, UpdateProduct, DashboardStats } from '../models/product.model';
+import { Product, CreateProduct, UpdateProduct, DashboardStats, Movement, MovementResult, NewMovement, ReportSummary } from '../models/product.model';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ProductService {
-  // 🔥 MUDE PARA URL RELATIVA (funciona em qualquer ambiente)
+  // URL relativa: em dev passa pelo proxy; em produção o front é servido pelo mesmo host da API
   private readonly apiUrl = '/api/products';
 
   constructor(private http: HttpClient) { }
@@ -46,5 +46,36 @@ export class ProductService {
 
   getCategories(): Observable<string[]> {
     return this.http.get<string[]>(`${this.apiUrl}/categories`);
+  }
+
+  // ---------- movimentações ----------
+  addMovement(productId: number, movement: NewMovement): Observable<MovementResult> {
+    return this.http.post<MovementResult>(`${this.apiUrl}/${productId}/movements`, movement).pipe(timeout(15000));
+  }
+
+  getProductMovements(productId: number, limit = 100): Observable<Movement[]> {
+    return this.http.get<Movement[]>(`${this.apiUrl}/${productId}/movements`, { params: { limit } });
+  }
+
+  getMovements(filter: { type?: string; limit?: number } = {}): Observable<Movement[]> {
+    let params = new HttpParams().set('limit', filter.limit ?? 50);
+    if (filter.type) params = params.set('type', filter.type);
+    return this.http.get<Movement[]>('/api/movements', { params });
+  }
+
+  // ---------- imagem ----------
+  uploadImage(productId: number, file: File): Observable<Product> {
+    const form = new FormData();
+    form.append('file', file);
+    return this.http.put<Product>(`${this.apiUrl}/${productId}/image`, form);
+  }
+
+  deleteImage(productId: number): Observable<void> {
+    return this.http.delete<void>(`${this.apiUrl}/${productId}/image`);
+  }
+
+  // ---------- relatórios ----------
+  getReport(days = 30): Observable<ReportSummary> {
+    return this.http.get<ReportSummary>('/api/reports/summary', { params: { days } });
   }
 }

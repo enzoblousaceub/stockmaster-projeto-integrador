@@ -10,7 +10,7 @@ const PUBLIC = () => new HttpContext().set(PUBLIC_AUTH, true);
 /** Resposta de /me só vale com o formato do contrato (um HTML 200 de proxy/fallback não é sessão). */
 function isMe(v: unknown): v is Me {
   const m = v as Partial<Me> | null;
-  return !!m && typeof m.email === 'string' && (m.perfil === 'Admin' || m.perfil === 'Visualizador');
+  return !!m && typeof m.email === 'string' && (m.perfil === 'Admin' || m.perfil === 'Operador' || m.perfil === 'Visualizador');
 }
 
 @Injectable({ providedIn: 'root' })
@@ -29,6 +29,8 @@ export class AuthService {
   readonly isAdmin = computed(() => this.user()?.perfil === 'Admin');
   /** Escrita em produtos: só Admin (o backend é a autoridade; aqui só escondemos os botões). */
   readonly canWrite = this.isAdmin;
+  /** Registrar entradas/saídas/ajustes de estoque: Admin ou Operador. */
+  readonly canMove = computed(() => this.user()?.perfil === 'Admin' || this.user()?.perfil === 'Operador');
 
   private loading?: Promise<void>;
 

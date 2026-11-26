@@ -1,0 +1,18 @@
+@use '../ui';
+
+.periods { display: flex; gap: 4px; padding: 4px; border: 1px solid var(--sm-border); border-radius: var(--sm-radius); background: var(--sm-surface); }
+.period { min-height: 40px; padding: 0 14px; border: 0; border-radius: var(--sm-radius-sm); background: transparent; color: var(--sm-text); font: inherit; font-weight: 600; cursor: pointer; }
+.period.on { background: var(--sm-primary); color: var(--sm-on-primary); }
+.panel { margin-bottom: 16px; }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.legend { display: flex; align-items: center; gap: 6px; margin: -4px 0 8px; color: var(--sm-text-2); font-size: 0.75rem; }
+.sw { width: 10px; height: 10px; border-radius: 2px; margin-left: 8px; }
+.sw-in, .bar-in { background: var(--sm-success); }
+.sw-out, .bar-out { background: var(--sm-danger); }
+.chart { display: flex; align-items: flex-end; gap: 2px; height: 140px; padding-bottom: 2px; border-bottom: 1px solid var(--sm-border); }
+.day { flex: 1; display: flex; align-items: flex-end; gap: 1px; height: 100%; min-width: 0; }
+.bar { flex: 1; min-height: 0; border-radius: 2px 2px 0 0; opacity: 0.85; }
+.axis { display: flex; justify-content: space-between; margin-top: 4px; }
+.total { margin: 12px 0 0; text-align: right; }
+@media (max-width: 899px) { .cols { grid-template-columns: 1fr; } }
+@media (max-width: 599px) { .hide-sm { display: none; } .periods { width: 100%; } .period { flex: 1; } }

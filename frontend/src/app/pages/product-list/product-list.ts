@@ -11,8 +11,9 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { Injectable } from '@angular/core';
 import { ProductService } from '../../services/product.service';
 import { AuthService } from '../../core/auth.service';
-import { Product } from '../../models/product.model';
+import { MovementResult, Product, productCode, productImageUrl } from '../../models/product.model';
 import { DeleteDialogComponent } from '../../components/delete-dialog/delete-dialog';
+import { MovementDialogComponent, MovementDialogData } from '../../components/movement-dialog/movement-dialog';
 
 @Injectable()
 class PtPaginatorIntl extends MatPaginatorIntl {
@@ -48,7 +49,9 @@ export class ProductListComponent implements OnInit, OnDestroy {
   private dialog = inject(MatDialog);
   private snackBar = inject(MatSnackBar);
   private destroyRef = inject(DestroyRef);
-  readonly canWrite = inject(AuthService).canWrite;
+  private auth = inject(AuthService);
+  readonly canWrite = this.auth.canWrite;
+  readonly canMove = this.auth.canMove;
 
   readonly state = signal<'loading' | 'error' | 'ready'>('loading');
   readonly products = signal<Product[]>([]);
@@ -185,7 +188,35 @@ export class ProductListComponent implements OnInit, OnDestroy {
   }
 
   code(p: Product): string {
-    return '#' + String(p.id).padStart(4, '0');
+    return productCode(p.id);
+  }
+
+  image(p: Product): string | null {
+    return productImageUrl(p);
+  }
+
+  // ---------- movimentação (entrada / saída / conferência) ----------
+  openMovement(p: Product, trigger: HTMLElement): void {
+    this.flushAll(); // ajustes rápidos pendentes saem antes, para o saldo do diálogo estar certo
+    const current = this.products().find((x) => x.id === p.id) ?? p;
+    const ref = this.dialog.open<MovementDialogComponent, MovementDialogData, MovementResult>(MovementDialogComponent, {
+      width: '460px',
+      maxWidth: 'calc(100vw - 32px)',
+      ariaLabelledBy: 'movement-title',
+      data: { product: current },
+      restoreFocus: false
+    });
+    ref.afterClosed().subscribe((result) => {
+      trigger.focus();
+      if (!result) return;
+      this.listGen++; // o valor do servidor prevalece sobre qualquer reversão otimista pendente
+      this.patchQuantity(p.id, result.product.quantity);
+      const m = result.movement;
+      const verb = m.type === 'Entrada' ? 'Entrada' : m.type === 'Saida' ? 'Saída' : 'Ajuste';
+      const msg = `${verb} registrada: ${p.name} agora tem ${result.product.quantity.toLocaleString('pt-BR')} em estoque`;
+      this.snackBar.open(msg, 'Fechar', { duration: 3500 });
+      this.announcement.set(msg);
+    });
   }
 
   // ---------- ajuste rápido de quantidade ----------

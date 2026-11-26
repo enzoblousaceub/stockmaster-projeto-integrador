@@ -1,0 +1,114 @@
+<div class="page" [attr.aria-busy]="state() === 'loading'">
+  <header class="page-header">
+    <a class="back-btn" routerLink="/products" aria-label="Voltar para a lista de produtos">
+      <mat-icon aria-hidden="true">arrow_back</mat-icon>
+    </a>
+    <div class="grow">
+      <h1>{{ product()?.name ?? 'Produto' }}</h1>
+      @if (product(); as p) { <p class="subtitle"><span class="num">{{ code() }}</span> · {{ p.category }}</p> }
+    </div>
+    @if (state() === 'ready') {
+      <div class="head-acts">
+        @if (canMove()) {
+          <button type="button" class="btn btn-primary" (click)="openMovement()" id="btn-detail-move">
+            <mat-icon aria-hidden="true">swap_vert</mat-icon><span>Movimentar</span>
+          </button>
+        }
+        @if (canWrite()) {
+          <a class="btn btn-outline" [routerLink]="['/products', product()!.id, 'edit']" id="btn-detail-edit">
+            <mat-icon aria-hidden="true">edit</mat-icon><span>Editar</span>
+          </a>
+        }
+      </div>
+    }
+  </header>
+
+  @switch (state()) {
+    @case ('loading') { <div aria-hidden="true">@for (i of [1, 2, 3, 4]; track i) { <span class="sk"></span> }</div> }
+    @case ('notfound') {
+      <div class="state-box" role="alert">
+        <mat-icon aria-hidden="true">search_off</mat-icon>
+        <h2>Produto não encontrado</h2>
+        <p>Ele pode ter sido excluído.</p>
+        <a class="btn btn-outline" routerLink="/products">Ver produtos</a>
+      </div>
+    }
+    @case ('error') {
+      <div class="state-box" role="alert">
+        <mat-icon aria-hidden="true">cloud_off</mat-icon>
+        <h2>Não foi possível carregar o produto</h2>
+        <p>Verifique sua conexão e tente novamente.</p>
+        <button type="button" class="btn btn-primary" (click)="load()">Tentar novamente</button>
+      </div>
+    }
+    @case ('ready') {
+      @if (product(); as p) {
+        <div class="top">
+          <div class="panel media">
+            @if (image(); as src) { <img [src]="src" [alt]="'Foto de ' + p.name" width="220" height="220"> }
+            @else { <div class="no-img" aria-hidden="true"><mat-icon>image</mat-icon></div> }
+          </div>
+          <div class="panel facts">
+            <dl>
+              <div><dt>Saldo</dt><dd><b class="num big">{{ p.quantity | number }}</b> <span [class]="'chip chip--' + status()">{{ statusLabel() }}</span></dd></div>
+              <div><dt>Estoque mínimo</dt><dd class="num">{{ p.minStock | number }}</dd></div>
+              <div><dt>Preço de venda</dt><dd class="num">{{ p.price | currency: 'BRL' : 'symbol' : '1.2-2' }}</dd></div>
+              <div><dt>Custo</dt><dd class="num">{{ p.cost | currency: 'BRL' : 'symbol' : '1.2-2' }}</dd></div>
+              <div><dt>Margem</dt><dd class="num">{{ margin() === null ? '—' : (margin()! | percent) }}</dd></div>
+              <div><dt>Valor em estoque (custo)</dt><dd class="num">{{ p.quantity * p.cost | currency: 'BRL' : 'symbol' : '1.2-2' }}</dd></div>
+            </dl>
+            @if (p.description) { <p class="desc">{{ p.description }}</p> }
+          </div>
+          <div class="panel forecast" aria-labelledby="fc-title">
+            <h2 id="fc-title"><mat-icon aria-hidden="true">insights</mat-icon>Previsão</h2>
+            @if (forecast(); as f) {
+              @if (f.avgDailyOut > 0) {
+                <p class="fc-main">
+                  @if (f.daysToStockout !== null && f.daysToStockout < 1) { Acaba <b>hoje</b> no ritmo atual. }
+                  @else { Acaba em <b class="num">~{{ f.daysToStockout | number: '1.0-0' }} dias</b> ({{ f.stockoutDate | date: 'dd/MM' }}). }
+                </p>
+                <p class="muted small">Consumo médio: <span class="num">{{ f.avgDailyOut | number: '1.0-2' }}</span>/dia (últimos 30 dias)</p>
+              } @else {
+                <p class="fc-main">Sem saídas nos últimos 30 dias.</p>
+              }
+              @if (f.needsReorder) {
+                <p class="reorder"><mat-icon aria-hidden="true">shopping_cart</mat-icon>
+                  Sugestão: comprar <b class="num">{{ f.suggestedReorder | number }}</b> unidades</p>
+              } @else {
+                <p class="muted small">Nenhuma reposição necessária agora.</p>
+              }
+            } @else {
+              <p class="muted">Previsão indisponível no momento.</p>
+            }
+          </div>
+        </div>
+
+        <section class="panel" aria-labelledby="hist-title">
+          <h2 id="hist-title"><mat-icon aria-hidden="true">history</mat-icon>Histórico de movimentações</h2>
+          @if (movements().length === 0) {
+            <p class="empty">Nenhuma movimentação registrada ainda.</p>
+          } @else {
+            <div class="tbl-wrap">
+              <table class="tbl">
+                <caption class="sr-only">Movimentações de {{ p.name }}</caption>
+                <thead><tr><th scope="col">Data</th><th scope="col">Tipo</th><th scope="col" class="r">Qtd.</th><th scope="col" class="r">Saldo</th><th scope="col">Motivo</th><th scope="col" class="hide-sm">Por</th></tr></thead>
+                <tbody>
+                  @for (m of movements(); track m.id) {
+                    <tr>
+                      <td class="num">{{ m.occurredAt | date: 'dd/MM/yy HH:mm' }}</td>
+                      <td><span [class]="chipClass(m.type)">{{ label[m.type] }}</span></td>
+                      <td class="r num" [class.pos]="m.delta > 0" [class.neg]="m.delta < 0">{{ m.delta > 0 ? '+' : '' }}{{ m.delta | number }}</td>
+                      <td class="r num">{{ m.quantityAfter | number }}</td>
+                      <td>{{ m.reason ?? '—' }}</td>
+                      <td class="muted small hide-sm">{{ m.createdBy ?? '—' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </section>
+      }
+    }
+  }
+</div>

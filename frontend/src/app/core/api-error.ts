@@ -45,6 +45,10 @@ export function messageFor(p: ApiProblem): string {
     case 'user_inactive': return 'Usuário inativo. Reative-o antes de redefinir o acesso.';
     case 'last_admin': return 'Não é possível desativar, rebaixar ou redefinir o último administrador ativo.';
     case 'forbidden': return 'Você não tem permissão para esta ação.';
+    case 'insufficient_stock': return 'Estoque insuficiente: a saída deixaria o saldo negativo.';
+    case 'quantity_out_of_range': return 'O saldo deve ficar entre 0 e 1.000.000.';
+    case 'no_change': return 'O saldo contado é igual ao atual; nada a ajustar.';
+    case 'not_found': return 'Produto não encontrado. Ele pode ter sido excluído.';
     case 'csrf_invalid': return 'A verificação de segurança falhou. Recarregue a página e tente novamente.';
     case 'service_misconfigured': return 'O serviço de ativação está indisponível. Avise o responsável pelo sistema.';
     case 'unauthenticated': return 'Sua sessão expirou. Entre novamente.';
