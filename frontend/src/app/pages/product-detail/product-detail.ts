@@ -36,6 +36,9 @@ export class ProductDetailComponent {
   readonly movements = signal<Movement[]>([]);
   readonly forecast = signal<ProductForecast | null>(null);
   readonly label = MOVEMENT_LABEL;
+  /** histórico longo: mostra 30 e expande sob demanda */
+  readonly shown = signal(30);
+  readonly visibleMovements = computed(() => this.movements().slice(0, this.shown()));
 
   readonly code = computed(() => (this.product() ? productCode(this.product()!.id) : ''));
   readonly image = computed(() => (this.product() ? productImageUrl(this.product()!) : null));

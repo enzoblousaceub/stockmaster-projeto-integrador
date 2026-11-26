@@ -93,7 +93,7 @@
                 <caption class="sr-only">Movimentações de {{ p.name }}</caption>
                 <thead><tr><th scope="col">Data</th><th scope="col">Tipo</th><th scope="col" class="r">Qtd.</th><th scope="col" class="r">Saldo</th><th scope="col">Motivo</th><th scope="col" class="hide-sm">Por</th></tr></thead>
                 <tbody>
-                  @for (m of movements(); track m.id) {
+                  @for (m of visibleMovements(); track m.id) {
                     <tr>
                       <td class="num">{{ m.occurredAt | date: 'dd/MM/yy HH:mm' }}</td>
                       <td><span [class]="chipClass(m.type)">{{ label[m.type] }}</span></td>
@@ -106,6 +106,11 @@
                 </tbody>
               </table>
             </div>
+            @if (movements().length > shown()) {
+              <button type="button" class="btn btn-outline more" (click)="shown.set(shown() + 50)">
+                Mostrar mais ({{ movements().length - shown() }} restantes)
+              </button>
+            }
           }
         </section>
       }

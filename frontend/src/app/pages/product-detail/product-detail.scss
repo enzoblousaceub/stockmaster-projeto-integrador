@@ -16,3 +16,4 @@ dd { margin: 0; display: flex; align-items: center; gap: 8px; }
 .reorder mat-icon { width: 20px; height: 20px; font-size: 20px; }
 @media (max-width: 1023px) { .top { grid-template-columns: 1fr 1fr; } .media { grid-row: span 2; } }
 @media (max-width: 599px) { .top { grid-template-columns: 1fr; } .media { grid-row: auto; } .hide-sm { display: none; } }
+.more { display: flex; margin: 24px auto 0; }

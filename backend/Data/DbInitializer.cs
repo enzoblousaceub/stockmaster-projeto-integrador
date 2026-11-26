@@ -131,14 +131,15 @@ namespace backend.Data
             // vendas medias por dia de cada produto (mesma ordem da lista acima)
             var rates = new[] { 2.2, 0.9, 0.7, 0.25, 0.6, 0.35, 1.8, 1.1 };
             var reasons = new[] { "Venda", "Venda", "Venda", "Venda", "Perda", "Uso interno" };
-            var start = now.Date.AddDays(-days).AddHours(12);
+            // um dia por iteracao a partir de 45 dias atras; o ultimo evento fica no maximo ~8h depois de "ontem a esta hora"
+            var start = now.AddDays(-days);
 
             for (var i = 0; i < products.Count; i++)
             {
                 var p = products[i];
                 var rate = rates[i % rates.Length];
                 var events = new List<(DateTime At, int Delta, string Reason)>();
-                for (var d = 1; d <= days; d++)
+                for (var d = 1; d < days; d++)
                 {
                     var at = start.AddDays(d).AddMinutes(rng.Next(0, 480));
                     var sold = (int)Math.Round(rate + (rng.NextDouble() - 0.5) * rate);
@@ -146,6 +147,8 @@ namespace backend.Data
                     // reposicao a cada 15 dias, menos para o produto que termina esgotado
                     if (d % 15 == 0 && p.Quantity > 0) events.Add((at.AddHours(-3), (int)Math.Ceiling(rate * 15), "Compra de fornecedor"));
                 }
+                // nada no futuro (relogio de quem abre o sistema logo depois do seed)
+                events.RemoveAll(e => e.At > now.AddMinutes(-5));
 
                 // saldo inicial suficiente para nunca ficar negativo e terminar no saldo cadastrado
                 var running = 0; var lowest = 0;
