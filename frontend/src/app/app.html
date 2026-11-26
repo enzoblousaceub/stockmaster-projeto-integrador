@@ -61,6 +61,12 @@
             <span class="nav-label">Produtos</span>
           </a>
         </li>
+        <li>
+          <a class="nav-link" routerLink="/reports" routerLinkActive="active" ariaCurrentWhenActive="page" id="nav-reports">
+            <mat-icon aria-hidden="true">insights</mat-icon>
+            <span class="nav-label">Relatórios</span>
+          </a>
+        </li>
         @if (auth.isAdmin()) {
           <li>
             <a class="nav-link" routerLink="/products/new" routerLinkActive="active" ariaCurrentWhenActive="page"

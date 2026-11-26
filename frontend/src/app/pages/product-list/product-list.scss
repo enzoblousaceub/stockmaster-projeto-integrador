@@ -320,3 +320,7 @@ th[aria-sort='descending'] mat-icon { opacity: 1; }
 
 .card-ro { display: flex; align-items: baseline; justify-content: space-between; margin-top: 8px; color: var(--sm-text-2); }
 .card-ro b { color: var(--sm-text); font-size: 1.0625rem; }
+
+.thumb { width: 36px; height: 36px; flex: none; border-radius: var(--sm-radius-sm); object-fit: cover; background: var(--sm-surface-2); }
+.p-link { color: inherit; }
+.p-link:hover { color: var(--sm-primary); text-decoration: underline; }

@@ -67,7 +67,7 @@
           <div class="kpi" id="stat-total-value">
             <span class="kpi-label"><mat-icon aria-hidden="true">payments</mat-icon>Valor em estoque</span>
             <span class="kpi-value num">{{ stats()?.totalValue | currency: 'BRL' : 'symbol' : '1.2-2' }}</span>
-            <span class="kpi-sub">preço × quantidade</span>
+            <span class="kpi-sub">a preço de venda · <span class="num">{{ stats()?.totalCost | currency: 'BRL' : 'symbol' : '1.0-0' }}</span> a custo</span>
           </div>
           <div class="kpi" [class.kpi--alert]="alertCount() > 0" [class.kpi--ok]="alertCount() === 0" id="stat-alerts">
             <span class="kpi-label">
@@ -83,7 +83,7 @@
             <div class="panel-head">
               <h2 id="h-restock">Precisa de reposição</h2>
               @if (alerts().length > 0) {
-                <a class="link" routerLink="/products">Ver produtos</a>
+                <a class="link" routerLink="/reports">Ver reposição sugerida</a>
               }
             </div>
 
@@ -97,7 +97,7 @@
                 @for (p of topAlerts(); track p.id) {
                   <li class="restock-item">
                     <div class="restock-main">
-                      <span class="restock-name">{{ p.name }}</span>
+                      <a class="restock-name" [routerLink]="['/products', p.id]">{{ p.name }}</a>
                       <span class="restock-meta">
                         {{ p.category }} ·
                         <span class="num">{{ p.quantity }}</span> em estoque, mínimo
@@ -107,11 +107,11 @@
                     <span class="chip" [class.chip--danger]="isOut(p)" [class.chip--warning]="!isOut(p)">
                       {{ isOut(p) ? 'Esgotado' : 'Baixo' }}
                     </span>
-                    @if (canWrite()) {
-                      <a class="btn-outline" [routerLink]="['/products', p.id, 'edit']" [attr.aria-label]="'Repor ' + p.name">
-                      <mat-icon aria-hidden="true">add_shopping_cart</mat-icon>
-                      <span>Repor</span>
-                    </a>
+                    @if (canMove()) {
+                      <button type="button" class="btn-outline" #rep (click)="restock(p, rep)" [attr.aria-label]="'Registrar entrada de ' + p.name">
+                        <mat-icon aria-hidden="true">add_shopping_cart</mat-icon>
+                        <span>Repor</span>
+                      </button>
                     }
                   </li>
                 }

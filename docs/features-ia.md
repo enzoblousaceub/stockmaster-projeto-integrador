@@ -37,7 +37,8 @@ Ao digitar o nome do produto, sugere categoria, descrição e estoque mínimo a 
 
 ### 4. Previsão de reposição
 "Este item acaba em ~9 dias; reponha X unidades."
-- **Pré-requisito:** hoje só existe a quantidade final. É preciso criar uma tabela de **movimentações** (entrada/saída, data, quantidade, usuário) e passar a registrá-las.
+- **Pré-requisito (concluído):** tabela `StockMovements` com entrada/saída/ajuste, data, quantidade, motivo e usuário.
+- **Versão estatística já implementada** em `/api/reports/summary` e na tela Relatórios (média móvel de 30 dias, sem LLM); o LLM pode entrar só para explicar o resultado.
 - Usa média móvel/consumo diário, sem LLM. O LLM, se entrar, só explica o resultado.
 
 ### 5. Resumo por e-mail (Fase 2)

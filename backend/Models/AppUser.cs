@@ -4,7 +4,11 @@ namespace backend.Models
     {
         public const string Admin = "Admin";
         public const string Viewer = "Visualizador";
-        public static bool IsValid(string? role) => role is Admin or Viewer;
+        /// <summary>Registra entradas e saidas de estoque, sem cadastrar/editar/excluir produtos nem gerir usuarios.</summary>
+        public const string Operator = "Operador";
+        public static bool IsValid(string? role) => role is Admin or Viewer or Operator;
+        /// <summary>Perfis que movimentam estoque.</summary>
+        public static bool CanMoveStock(string? role) => role is Admin or Operator;
     }
 
     public static class UserStatus

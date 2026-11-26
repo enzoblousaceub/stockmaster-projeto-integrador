@@ -187,12 +187,18 @@ namespace backend.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<decimal>("Cost")
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime?>("ImageUpdatedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("MinStock")
                         .HasColumnType("integer");
@@ -218,6 +224,94 @@ namespace backend.Migrations
                     b.HasIndex("UpdatedAt");
 
                     b.ToTable("Products");
+                });
+
+            modelBuilder.Entity("backend.Models.ProductImage", b =>
+                {
+                    b.Property<int>("ProductId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<byte[]>("Data")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.HasKey("ProductId");
+
+                    b.ToTable("ProductImages");
+                });
+
+            modelBuilder.Entity("backend.Models.StockMovement", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)");
+
+                    b.Property<int>("Delta")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("ProductId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("QuantityAfter")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OccurredAt");
+
+                    b.HasIndex("ProductId", "OccurredAt");
+
+                    b.ToTable("StockMovements");
+                });
+
+            modelBuilder.Entity("backend.Models.ProductImage", b =>
+                {
+                    b.HasOne("backend.Models.Product", null)
+                        .WithOne()
+                        .HasForeignKey("backend.Models.ProductImage", "ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("backend.Models.StockMovement", b =>
+                {
+                    b.HasOne("backend.Models.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Product");
                 });
 #pragma warning restore 612, 618
         }

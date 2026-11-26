@@ -6,7 +6,7 @@ import { ProductService } from './product.service';
 import { Product } from '../models/product.model';
 
 const product: Product = {
-  id: 5, name: 'Mouse', category: 'Eletrônicos', quantity: 7, price: 10, minStock: 2,
+  id: 5, name: 'Mouse', category: 'Eletrônicos', quantity: 7, price: 10, cost: 6, minStock: 2,
   createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z'
 };
 
@@ -51,5 +51,43 @@ describe('ProductService.adjustQuantity', () => {
     http.expectOne('/api/products/5/quantity').flush({ title: 'Invalid stock quantity' }, { status: 409, statusText: 'Conflict' });
 
     expect(status).toBe(409);
+  });
+});
+
+describe('ProductService: movimentações, imagem e relatórios', () => {
+  let service: ProductService;
+  let http: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    service = TestBed.inject(ProductService);
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => http.verify());
+
+  it('POST /api/products/{id}/movements com o corpo da movimentação', () => {
+    service.addMovement(5, { type: 'Saida', quantity: 2, reason: 'Venda' }).subscribe();
+    const req = http.expectOne('/api/products/5/movements');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ type: 'Saida', quantity: 2, reason: 'Venda' });
+    req.flush({});
+  });
+
+  it('PUT da imagem como multipart (campo "file")', () => {
+    const file = new File([new Uint8Array([1, 2, 3])], 'foto.png', { type: 'image/png' });
+    service.uploadImage(5, file).subscribe();
+    const req = http.expectOne('/api/products/5/image');
+    expect(req.request.method).toBe('PUT');
+    expect(req.request.body instanceof FormData).toBe(true);
+    expect((req.request.body as FormData).get('file')).toBeTruthy();
+    req.flush(product);
+  });
+
+  it('GET /api/reports/summary com o período', () => {
+    service.getReport(90).subscribe();
+    const req = http.expectOne((r) => r.url === '/api/reports/summary');
+    expect(req.request.params.get('days')).toBe('90');
+    req.flush({});
   });
 });

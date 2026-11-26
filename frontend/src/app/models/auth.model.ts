@@ -1,4 +1,4 @@
-export type Perfil = 'Admin' | 'Visualizador';
+export type Perfil = 'Admin' | 'Operador' | 'Visualizador';
 export type UserStatus = 'Pendente' | 'Ativo' | 'Inativo';
 
 /** Resposta de /api/auth/login e /api/auth/me */

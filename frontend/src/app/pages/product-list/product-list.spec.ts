@@ -11,7 +11,7 @@ import { Product } from '../../models/product.model';
 import { AuthService } from '../../core/auth.service';
 
 const mk = (id: number, quantity: number): Product => ({
-  id, name: `Produto ${id}`, category: 'Cat', quantity, price: 10, minStock: 2,
+  id, name: `Produto ${id}`, category: 'Cat', quantity, price: 10, cost: 6, minStock: 2,
   createdAt: '', updatedAt: ''
 });
 
@@ -25,6 +25,7 @@ describe('ProductListComponent: ajuste rápido de quantidade (+/-)', () => {
   let snack: { open: ReturnType<typeof vi.fn> };
   let cmp: ProductListComponent;
   const canWrite = signal(true);
+  const canMove = signal(true);
 
   const qty = (id = 1) => cmp.products().find((p) => p.id === id)!.quantity;
 
@@ -38,6 +39,7 @@ describe('ProductListComponent: ajuste rápido de quantidade (+/-)', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     canWrite.set(true);
+    canMove.set(true);
     service = {
       getProducts: vi.fn(),
       getCategories: vi.fn(() => of([])),
@@ -51,7 +53,7 @@ describe('ProductListComponent: ajuste rápido de quantidade (+/-)', () => {
         provideRouter([]),
         { provide: ProductService, useValue: service },
         { provide: MatSnackBar, useValue: snack },
-        { provide: AuthService, useValue: { canWrite } },
+        { provide: AuthService, useValue: { canWrite, canMove } },
         { provide: ActivatedRoute, useValue: { queryParamMap: of(convertToParamMap({})) } }
       ]
     });
@@ -228,6 +230,7 @@ describe('ProductListComponent: ajuste rápido de quantidade (+/-)', () => {
 
   it('Visualizador: sem +/-, editar, excluir, Novo produto nem FAB (só leitura)', () => {
     canWrite.set(false);
+    canMove.set(false);
     service.getProducts.mockReturnValue(of([mk(1, 5)]));
     const f = TestBed.createComponent(ProductListComponent);
     f.detectChanges();
@@ -256,5 +259,28 @@ describe('ProductListComponent: ajuste rápido de quantidade (+/-)', () => {
     vi.advanceTimersByTime(400);
     expect(qty()).toBe(5);
     expect(snack.open).not.toHaveBeenCalled();
+  });
+
+  it('Operador: movimenta (+/- e Movimentar), mas sem editar, excluir nem Novo produto', () => {
+    canWrite.set(false);
+    canMove.set(true);
+    service.getProducts.mockReturnValue(of([mk(1, 5)]));
+    const f = TestBed.createComponent(ProductListComponent);
+    f.detectChanges();
+    const el: HTMLElement = f.nativeElement;
+    expect(el.querySelector('.stepper')).toBeTruthy();
+    expect(el.querySelector('[aria-label="Movimentar estoque de Produto 1"]')).toBeTruthy();
+    expect(el.querySelector('[aria-label="Editar Produto 1"]')).toBeNull();
+    expect(el.querySelector('[aria-label="Excluir Produto 1"]')).toBeNull();
+    expect(el.querySelector('#btn-new-product')).toBeNull();
+    expect(el.querySelector('#fab-new-product')).toBeNull();
+  });
+
+  it('nome do produto leva à ficha com histórico', () => {
+    service.getProducts.mockReturnValue(of([mk(1, 5)]));
+    const f = TestBed.createComponent(ProductListComponent);
+    f.detectChanges();
+    const a = (f.nativeElement as HTMLElement).querySelector('a.p-link') as HTMLAnchorElement;
+    expect(a.getAttribute('href')).toBe('/products/1');
   });
 });

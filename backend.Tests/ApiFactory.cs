@@ -9,13 +9,18 @@ using Testcontainers.PostgreSql;
 namespace backend.Tests;
 
 /// <summary>
-/// Container PostgreSQL unico por execucao de testes (Testcontainers, exige Docker em execucao).
+/// Container PostgreSQL unico por execucao de testes (Testcontainers, exige Docker em execucao),
+/// ou um servidor externo indicado em TEST_POSTGRES.
 /// Cada <see cref="ApiFactory"/> usa um banco proprio dentro dele, para isolar os testes.
 /// </summary>
 public static class SharedPostgres
 {
     private static readonly Lazy<Task<string>> Server = new(async () =>
     {
+        // Sem Docker: aponte TEST_POSTGRES para um PostgreSQL ja rodando (ex.: Host=127.0.0.1;Port=5433;Username=postgres)
+        var external = Environment.GetEnvironmentVariable("TEST_POSTGRES");
+        if (!string.IsNullOrWhiteSpace(external)) return external;
+
         var container = new PostgreSqlBuilder().WithImage("postgres:17").Build();
         await container.StartAsync();
         return container.GetConnectionString();

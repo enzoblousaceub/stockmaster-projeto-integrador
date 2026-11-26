@@ -5,7 +5,10 @@ import { forkJoin } from 'rxjs';
 import { MatIconModule } from '@angular/material/icon';
 import { ProductService } from '../../services/product.service';
 import { AuthService } from '../../core/auth.service';
-import { DashboardStats, Product } from '../../models/product.model';
+import { DashboardStats, MovementResult, Product } from '../../models/product.model';
+import { MatDialog } from '@angular/material/dialog';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { MovementDialogComponent, MovementDialogData } from '../../components/movement-dialog/movement-dialog';
 
 interface CategoryBar {
   name: string;
@@ -24,7 +27,11 @@ interface CategoryBar {
 })
 export class DashboardComponent {
   private productService = inject(ProductService);
-  readonly canWrite = inject(AuthService).canWrite;
+  private dialog = inject(MatDialog);
+  private snack = inject(MatSnackBar);
+  private auth = inject(AuthService);
+  readonly canWrite = this.auth.canWrite;
+  readonly canMove = this.auth.canMove;
 
   readonly state = signal<'loading' | 'error' | 'ready'>('loading');
   readonly stats = signal<DashboardStats | null>(null);
@@ -72,6 +79,22 @@ export class DashboardComponent {
         this.state.set('ready');
       },
       error: () => this.state.set('error')
+    });
+  }
+
+  /** "Repor": registra a entrada da mercadoria que chegou e recarrega os indicadores. */
+  restock(p: Product, trigger: HTMLElement): void {
+    const ref = this.dialog.open<MovementDialogComponent, MovementDialogData, MovementResult>(MovementDialogComponent, {
+      width: '460px',
+      maxWidth: 'calc(100vw - 32px)',
+      ariaLabelledBy: 'movement-title',
+      data: { product: p, type: 'Entrada' },
+      restoreFocus: false
+    });
+    ref.afterClosed().subscribe((result) => {
+      if (!result) { trigger.focus(); return; }
+      this.snack.open(`Entrada registrada: ${p.name} agora tem ${result.product.quantity.toLocaleString('pt-BR')}`, 'Fechar', { duration: 3500 });
+      this.load();
     });
   }
 

@@ -221,7 +221,7 @@ namespace backend.Controllers
                 .Select(t => t.LockedUntil).OrderByDescending(x => x).FirstOrDefaultAsync(ct);
 
         private ObjectResult InvalidProfile() => Fail(400, "validation_error", "Dados invalidos",
-            errors: new Dictionary<string, string> { ["perfil"] = $"Perfil deve ser exatamente \"{Roles.Admin}\" ou \"{Roles.Viewer}\"." });
+            errors: new Dictionary<string, string> { ["perfil"] = $"Perfil deve ser exatamente \"{Roles.Admin}\", \"{Roles.Operator}\" ou \"{Roles.Viewer}\"." });
 
         private ObjectResult InvalidEmail() => Fail(400, "validation_error", "Dados invalidos",
             errors: new Dictionary<string, string> { ["email"] = "Informe um e-mail valido." });

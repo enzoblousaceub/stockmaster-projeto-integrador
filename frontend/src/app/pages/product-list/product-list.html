@@ -86,7 +86,7 @@
       } @else {
         <!-- Tabela (tablet/desktop) -->
         <div class="panel table-panel">
-          <table class="tbl" [class.readonly]="!canWrite()">
+          <table class="tbl" [class.readonly]="!canMove()">
             <caption class="sr-only">Lista de produtos</caption>
             <colgroup>
               <col class="c-name"><col class="c-cat"><col class="c-qty"><col class="c-price"><col class="c-status"><col class="c-actions">
@@ -121,8 +121,9 @@
                 <tr>
                   <td>
                     <div class="cell-product">
+                      @if (image(p); as src) { <img class="thumb" [src]="src" alt="" width="36" height="36" loading="lazy"> }
                       <div class="cell-text">
-                        <span class="p-name" [title]="p.name">{{ p.name }}</span>
+                        <a class="p-name p-link" [routerLink]="['/products', p.id]" [title]="p.name">{{ p.name }}</a>
                         <span class="p-code num">{{ code(p) }}</span>
                       </div>
                     </div>
@@ -132,6 +133,12 @@
                   <td class="num-col num">{{ p.price | currency: 'BRL' : 'symbol' : '1.2-2' }}</td>
                   <td><span class="chip" [class]="'chip chip--' + status(p)">{{ statusLabel(p) }}</span></td>
                   <td class="actions-col">
+                    @if (canMove()) {
+                    <button type="button" class="icon-act" #mv (click)="openMovement(p, mv)"
+                      [attr.aria-label]="'Movimentar estoque de ' + p.name" title="Entrada / saída">
+                      <mat-icon aria-hidden="true">swap_vert</mat-icon>
+                    </button>
+                    }
                     @if (canWrite()) {
                     <a class="icon-act" [routerLink]="['/products', p.id, 'edit']" [attr.aria-label]="'Editar ' + p.name" title="Editar">
                       <mat-icon aria-hidden="true">edit</mat-icon>
@@ -154,7 +161,7 @@
             <li class="card">
               <div class="card-top">
                 <div class="card-id">
-                  <span class="p-name">{{ p.name }}</span>
+                  <a class="p-name p-link" [routerLink]="['/products', p.id]">{{ p.name }}</a>
                   <span class="card-meta"><span class="cat">{{ p.category }}</span> · <span class="num">{{ code(p) }}</span></span>
                 </div>
                 <span [class]="'chip chip--' + status(p)">{{ statusLabel(p) }}</span>
@@ -163,7 +170,7 @@
                 <span class="price num">{{ p.price | currency: 'BRL' : 'symbol' : '1.2-2' }}</span>
                 <span class="min">mínimo <span class="num">{{ p.minStock }}</span></span>
               </div>
-              @if (canWrite()) {
+              @if (canMove()) {
               <div class="card-bottom">
                 <div class="stepper" role="group" [attr.aria-label]="'Quantidade de ' + p.name">
                   <button type="button" (click)="adjust(p, -1)" [attr.aria-disabled]="p.quantity <= 0"
@@ -177,6 +184,10 @@
                   </button>
                 </div>
                 <div class="card-acts">
+                  <button type="button" class="icon-act" #mvm (click)="openMovement(p, mvm)" [attr.aria-label]="'Movimentar estoque de ' + p.name">
+                    <mat-icon aria-hidden="true">swap_vert</mat-icon>
+                  </button>
+                  @if (canWrite()) {
                   <a class="icon-act" [routerLink]="['/products', p.id, 'edit']" [attr.aria-label]="'Editar ' + p.name">
                     <mat-icon aria-hidden="true">edit</mat-icon>
                   </a>
@@ -184,6 +195,7 @@
                     [attr.aria-label]="'Excluir ' + p.name">
                     <mat-icon aria-hidden="true">delete</mat-icon>
                   </button>
+                  }
                 </div>
               </div>
             } @else {
