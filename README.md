@@ -61,30 +61,59 @@ npm start
 
 ## 📖 Funcionalidades da Aplicação
 
-### 1. Painel de Controle (Dashboard)
-Ao abrir a aplicação, a tela inicial exibe indicadores em tempo real:
-*   **Cards de Estatísticas:** Total de produtos cadastrados, quantidade total de itens em estoque e valor monetário total do patrimônio (em R$).
-*   **Alertas de Risco:** Monitoramento visual de itens em **Estoque Baixo** (abaixo do nível mínimo) e **Itens Esgotados** (estoque zerado).
-*   **Ações Rápidas:** Acesso direto para cadastrar novo produto ou visualizar a listagem completa.
+### Perfis de acesso
+| Perfil | O que pode fazer |
+|---|---|
+| **Admin** | Tudo: cadastrar/editar/excluir produtos, imagens, movimentar estoque, gerenciar usuários |
+| **Operador** | Registrar entradas, saídas e conferências; ver produtos, fichas e relatórios |
+| **Visualizador** | Somente leitura (produtos, fichas, relatórios) |
 
-### 2. Gestão de Produtos (Listagem)
-No menu lateral, acesse **"Produtos"**:
-*   **Busca:** Pesquise produtos pelo nome ou descrição em tempo real.
-*   **Filtro por Categoria:** Visualize itens específicos (ex.: Eletrônicos, Móveis, Acessórios, Escritório).
-*   **Ordenação e Paginação:** Ordene colunas clicando no cabeçalho e navegue por páginas.
-*   **Indicadores de Status:**
-    *   🟢 **Em Estoque:** Quantidade adequada.
-    *   🟡 **Estoque Baixo:** Quantidade menor ou igual ao estoque mínimo definido.
-    *   🔴 **Esgotado:** Quantidade zerada.
+### 1. Dashboard
+*   **Indicadores:** total de produtos, itens em estoque, valor do estoque (a preço de venda e a custo) e alertas.
+*   **Precisa de reposição:** itens abaixo do mínimo; o botão **Repor** registra a entrada da mercadoria que chegou.
+*   **Estoque por categoria.**
 
-### 3. Cadastro e Edição
-*   **Adicionar:** Clique em **"Novo Produto"** ou no ícone **"+"**.
-*   **Editar:** Clique no ícone de lápis em qualquer linha da tabela.
-*   **Preview Dinâmico:** Visualização prévia do card com imagem e preço em tempo real durante a digitação.
-*   **Campos de Validação:** Nome obrigatório, categoria, preço, quantidade e nível mínimo de estoque.
+### 2. Produtos (lista)
+*   Busca, filtro por categoria, ordenação e paginação; status 🟢 Em estoque, 🟡 Baixo, 🔴 Esgotado.
+*   Código do produto (`#0001`, RF002) e miniatura da imagem.
+*   **Movimentar** (ícone ⇅): abre o registro de entrada/saída/conferência. Os botões **+/−** (celular) fazem ajuste rápido.
 
-### 4. Exclusão com Confirmação
-*   Ao clicar no ícone de lixeira, um modal de confirmação previne exclusões acidentais.
+### 3. Movimentações de estoque (RF006, RF007, RF008)
+*   **Entrada:** quantidade, data e motivo (compra, devolução de cliente...).
+*   **Saída:** quantidade, data e **motivo obrigatório** (venda, perda/avaria, uso interno...). O sistema não deixa o saldo ficar negativo.
+*   **Conferência:** informa o saldo contado e o sistema registra a diferença como ajuste (inventário).
+*   O saldo é atualizado automaticamente e **sempre bate com a soma do histórico**: cadastro com quantidade inicial gera "Estoque inicial", e ajustes rápidos/edições geram "Ajuste".
+*   Registros simultâneos são seguros (a linha do produto é travada na transação).
+
+### 4. Ficha do produto
+*   Dados, imagem, custo, preço, margem e valor em estoque.
+*   **Previsão:** consumo médio diário, em quantos dias o produto acaba e sugestão de compra.
+*   Histórico completo de movimentações (data, tipo, quantidade, saldo após, motivo, usuário).
+
+### 5. Relatórios (RF010, RF011)
+*   Período de 7, 30 ou 90 dias: entradas, saídas, vendas e margem estimadas, estoque a custo e a preço.
+*   Gráfico de entradas e saídas por dia.
+*   **Reposição sugerida:** produtos abaixo do mínimo ou que acabam em até 14 dias; sugestão = consumo de 30 dias + estoque mínimo − saldo, com custo estimado da compra.
+*   **Mais vendidos**, **parados** (capital imobilizado) e previsão dos demais produtos.
+*   A previsão é estatística simples (média de saídas no período); ajustes de conferência não contam como consumo.
+
+### 6. Cadastro e edição (Admin)
+*   Nome, descrição, categoria (com sugestões), **preço de venda**, **custo**, quantidade inicial e estoque mínimo.
+*   **Imagem** (RF003): JPEG, PNG ou WebP até 2 MB, guardada no PostgreSQL (o disco do Render é temporário). O tipo é conferido pelo conteúdo do arquivo.
+*   Na edição, o saldo fica bloqueado: muda-se por movimentação, para manter o histórico.
+
+### 7. Usuários e auditoria (Admin)
+*   Convite por e-mail, perfis, ativação/desativação. A auditoria registra login, usuários e também cadastro, edição, exclusão e imagem de produtos.
+
+### API (resumo)
+| Método e rota | Perfil |
+|---|---|
+| `GET /api/products`, `/stats`, `/categories`, `/{id}`, `/{id}/image` | todos |
+| `POST/PUT/DELETE /api/products`, `PUT/DELETE /api/products/{id}/image` | Admin |
+| `POST /api/products/{id}/movements` `{type, quantity, reason, occurredAt}` | Admin, Operador |
+| `PATCH /api/products/{id}/quantity` `{delta}` (ajuste rápido) | Admin, Operador |
+| `GET /api/products/{id}/movements`, `GET /api/movements?type=&from=&to=&limit=` | todos |
+| `GET /api/reports/summary?days=30` | todos |
 
 ---
 
@@ -92,19 +121,29 @@ No menu lateral, acesse **"Produtos"**:
 
 ```txt
 newrepositorygithub/
-├── backend/                  # ASP.NET Core Web API
-│   ├── Controllers/          # Endpoints REST (ProductsController)
-│   ├── Data/                 # AppDbContext e DbInitializer (Seed inicial)
-│   ├── DTOs/                 # Objetos de transferência de dados (Create/Update)
-│   ├── Models/               # Entidades de domínio (Product)
-│   ├── appsettings.json      # Configuração da aplicação (Porta 8080)
-│   └── backend.http          # Arquivo para testes de API via IDE
-├── frontend/                 # Aplicação Angular (SPA)
-│   ├── src/app/pages/        # Dashboard, Lista de Produtos e Formulário
-│   ├── src/app/components/   # Componentes compartilhados (Modal de confirmação)
-│   ├── src/app/services/     # Integração HTTP com a API
-│   └── proxy.conf.json       # Proxy reverso local para localhost:8080
-└── .github/workflows/        # Pipeline de CI/CD para deploy no Azure
+├── backend/                  # ASP.NET Core Web API (.NET 10)
+│   ├── Controllers/          # Products, Movements, Reports, Auth, Users
+│   ├── Services/             # StockService (saldo + histórico), ForecastService (relatórios/previsão), ImageSniffer
+│   ├── Data/                 # AppDbContext, DbInitializer (seed com 45 dias de histórico)
+│   ├── Migrations/           # EF Core (aplicadas na inicialização)
+│   ├── Models/ e DTOs/       # Product, StockMovement, ProductImage, AppUser...
+│   └── Security/             # autenticação por cookie, CSRF, rate limit, auditoria, e-mail
+├── backend.Tests/            # testes de integração (PostgreSQL real)
+├── frontend/                 # Angular 21 (PWA)
+│   ├── src/app/pages/        # dashboard, products, product-detail, product-form, reports, users, auth
+│   ├── src/app/components/   # diálogos (movimentação, exclusão, usuários, configurações)
+│   ├── src/app/core/         # autenticação, guards, interceptor, erros da API
+│   └── src/app/services/     # integração HTTP
+├── docs/                     # deploy no Render, Resend, planejamento de IA
+└── .github/workflows/ci.yml  # build e testes (o deploy é feito pelo Render)
+```
+
+### Testes
+```bash
+dotnet test backend.Tests            # sobe um PostgreSQL via Testcontainers (Docker)
+# sem Docker: aponte para um PostgreSQL já rodando
+TEST_POSTGRES="Host=127.0.0.1;Port=5432;Username=postgres;Password=..." dotnet test backend.Tests
+cd frontend && npm test -- --watch=false
 ```
 
 ---
@@ -121,6 +160,9 @@ O `render.yaml` cria o serviço web (Docker) e um Postgres ligado a ele via `DAT
 
 > [!WARNING]
 > O Postgres do `render.yaml` está no plano **gratuito**, apenas para validação: **expira 30 dias após a criação** (14 dias de carência, depois o Render apaga o banco e os dados) e **não tem backup**. **Antes de usar dados reais, troque `plan: free` por um plano pago.**
+
+> [!NOTE]
+> **Atualização com movimentações:** a migration `StockMovementsCostImages` cria o histórico e registra o saldo atual de cada produto existente como um ajuste "Saldo anterior ao historico" (não conta como entrada nem como consumo). O custo dos produtos existentes começa em R$ 0,00: preencha na edição para os relatórios de margem e valor a custo ficarem corretos.
 
 ### Primeiro acesso e checagens pós-deploy
 1. No painel do Render, preencha os segredos `Auth__AdminEmail`, `Auth__AdminSenha`, `Auth__CodeHmacKey` e `Auth__KeyEncryptionKey` (e, para o convite por e-mail, `Email__ResendApiKey`, `Email__From` e `App__PublicBaseUrl`) (declarados no `render.yaml` com `sync: false`). Faça o primeiro login com o Admin e crie as demais pessoas.
