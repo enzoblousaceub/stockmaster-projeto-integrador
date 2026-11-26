@@ -21,6 +21,10 @@ namespace backend.DTOs
         [Range(typeof(decimal), "0", "1000000", ParseLimitsInInvariantCulture = true, ConvertValueInInvariantCulture = true)]
         public decimal Price { get; set; }
 
+        /// <summary>Custo por unidade (opcional; padrao 0).</summary>
+        [Range(typeof(decimal), "0", "1000000", ParseLimitsInInvariantCulture = true, ConvertValueInInvariantCulture = true)]
+        public decimal Cost { get; set; }
+
         [Range(0, Limits.MaxValue)]
         public int MinStock { get; set; }
     }

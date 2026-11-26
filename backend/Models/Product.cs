@@ -24,11 +24,18 @@ namespace backend.Models
         [Range(typeof(decimal), "0", "1000000", ParseLimitsInInvariantCulture = true, ConvertValueInInvariantCulture = true)]
         public decimal Price { get; set; }
 
+        /// <summary>Custo de aquisicao por unidade (RF001). Usado no valor do estoque a custo e na margem estimada.</summary>
+        [Range(typeof(decimal), "0", "1000000", ParseLimitsInInvariantCulture = true, ConvertValueInInvariantCulture = true)]
+        public decimal Cost { get; set; }
+
         [Range(0, Limits.MaxValue)]
         public int MinStock { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+        /// <summary>Quando a imagem foi trocada pela ultima vez (null = sem imagem). Serve tambem para invalidar cache no front.</summary>
+        public DateTime? ImageUpdatedAt { get; set; }
     }
 }

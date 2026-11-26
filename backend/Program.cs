@@ -51,6 +51,8 @@ builder.Services.AddAppAuth(builder.Configuration);
 // PostgreSQL (DATABASE_URL no Render; ConnectionStrings:Default em dev/testes)
 var connectionString = DatabaseConnection.Resolve(builder.Configuration);
 builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
+builder.Services.AddScoped<backend.Services.StockService>();
+builder.Services.AddScoped<backend.Services.ForecastService>();
 
 // CORS: o front e servido pelo mesmo host, entao em producao nao ha CORS.
 // So habilita para as origens listadas em Cors:AllowedOrigins (ex.: http://localhost:4200 em dev).

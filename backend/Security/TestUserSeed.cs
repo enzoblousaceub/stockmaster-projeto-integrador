@@ -35,7 +35,7 @@ namespace backend.Security
             if (string.IsNullOrWhiteSpace(perfil)) perfil = Roles.Viewer;
             if (!Roles.IsValid(perfil))
             {
-                log.LogError("Seed__TestPerfil invalido (use '{Viewer}' ou '{Admin}'): usuario de teste nao criado.", Roles.Viewer, Roles.Admin);
+                log.LogError("Seed__TestPerfil invalido (use '{Viewer}', '{Operator}' ou '{Admin}'): usuario de teste nao criado.", Roles.Viewer, Roles.Operator, Roles.Admin);
                 return;
             }
 

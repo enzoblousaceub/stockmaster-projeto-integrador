@@ -22,6 +22,7 @@ namespace backend.Data
                     Category = "Eletrônicos",
                     Quantity = 45,
                     Price = 89.90m,
+                    Cost = 52.00m,
                     MinStock = 10,
                     CreatedAt = now,
                     UpdatedAt = now
@@ -33,6 +34,7 @@ namespace backend.Data
                     Category = "Eletrônicos",
                     Quantity = 20,
                     Price = 249.90m,
+                    Cost = 155.00m,
                     MinStock = 5,
                     CreatedAt = now,
                     UpdatedAt = now
@@ -44,6 +46,7 @@ namespace backend.Data
                     Category = "Acessórios",
                     Quantity = 15,
                     Price = 139.90m,
+                    Cost = 82.00m,
                     MinStock = 5,
                     CreatedAt = now,
                     UpdatedAt = now
@@ -55,6 +58,7 @@ namespace backend.Data
                     Category = "Móveis",
                     Quantity = 8,
                     Price = 179.90m,
+                    Cost = 105.00m,
                     MinStock = 3,
                     CreatedAt = now,
                     UpdatedAt = now
@@ -66,6 +70,7 @@ namespace backend.Data
                     Category = "Eletrônicos",
                     Quantity = 12,
                     Price = 159.90m,
+                    Cost = 96.00m,
                     MinStock = 4,
                     CreatedAt = now,
                     UpdatedAt = now
@@ -77,6 +82,7 @@ namespace backend.Data
                     Category = "Móveis",
                     Quantity = 4,
                     Price = 79.90m,
+                    Cost = 41.00m,
                     MinStock = 5,
                     CreatedAt = now,
                     UpdatedAt = now
@@ -88,6 +94,7 @@ namespace backend.Data
                     Category = "Escritório",
                     Quantity = 60,
                     Price = 34.90m,
+                    Cost = 16.50m,
                     MinStock = 15,
                     CreatedAt = now,
                     UpdatedAt = now
@@ -99,6 +106,7 @@ namespace backend.Data
                     Category = "Acessórios",
                     Quantity = 0,
                     Price = 19.90m,
+                    Cost = 8.40m,
                     MinStock = 10,
                     CreatedAt = now,
                     UpdatedAt = now
@@ -106,6 +114,72 @@ namespace backend.Data
             };
 
             context.Products.AddRange(products);
+            context.SaveChanges();
+            SeedHistory(context, products, now);
+        }
+    
+
+        /// <summary>
+        /// Historico de demonstracao (ultimos 45 dias): estoque inicial, vendas diarias e compras quinzenais,
+        /// para relatorios e previsao terem dados. Deterministico (mesma semente) e coerente: o saldo final de cada
+        /// produto e exatamente a soma das suas movimentacoes.
+        /// </summary>
+        private static void SeedHistory(AppDbContext context, List<Product> products, DateTime now)
+        {
+            var rng = new Random(42);
+            const int days = 45;
+            // vendas medias por dia de cada produto (mesma ordem da lista acima)
+            var rates = new[] { 2.2, 0.9, 0.7, 0.25, 0.6, 0.35, 1.8, 1.1 };
+            var reasons = new[] { "Venda", "Venda", "Venda", "Venda", "Perda", "Uso interno" };
+            var start = now.Date.AddDays(-days).AddHours(12);
+
+            for (var i = 0; i < products.Count; i++)
+            {
+                var p = products[i];
+                var rate = rates[i % rates.Length];
+                var events = new List<(DateTime At, int Delta, string Reason)>();
+                for (var d = 1; d <= days; d++)
+                {
+                    var at = start.AddDays(d).AddMinutes(rng.Next(0, 480));
+                    var sold = (int)Math.Round(rate + (rng.NextDouble() - 0.5) * rate);
+                    if (sold > 0) events.Add((at, -sold, reasons[rng.Next(reasons.Length)]));
+                    // reposicao a cada 15 dias, menos para o produto que termina esgotado
+                    if (d % 15 == 0 && p.Quantity > 0) events.Add((at.AddHours(-3), (int)Math.Ceiling(rate * 15), "Compra de fornecedor"));
+                }
+
+                // saldo inicial suficiente para nunca ficar negativo e terminar no saldo cadastrado
+                var running = 0; var lowest = 0;
+                foreach (var e in events) { running += e.Delta; lowest = Math.Min(lowest, running); }
+                var initial = p.Quantity - running;
+                if (initial + lowest < 0)
+                {
+                    // nao fecha: aumenta o estoque inicial e corrige o saldo final com uma conferencia
+                    initial = -lowest;
+                }
+
+                var moves = new List<StockMovement>();
+                var qty = initial;
+                if (initial > 0)
+                    moves.Add(new StockMovement { ProductId = p.Id, ProductName = p.Name, Type = MovementTypes.In, Delta = initial,
+                        QuantityAfter = qty, Reason = "Estoque inicial", OccurredAt = start, CreatedAt = start, CreatedBy = "seed" });
+                foreach (var e in events.OrderBy(e => e.At))
+                {
+                    qty += e.Delta;
+                    moves.Add(new StockMovement { ProductId = p.Id, ProductName = p.Name,
+                        Type = e.Delta > 0 ? MovementTypes.In : MovementTypes.Out, Delta = e.Delta, QuantityAfter = qty,
+                        Reason = e.Reason, OccurredAt = e.At, CreatedAt = e.At, CreatedBy = "seed" });
+                }
+                if (qty != p.Quantity)
+                {
+                    var at = now.AddHours(-1);
+                    moves.Add(new StockMovement { ProductId = p.Id, ProductName = p.Name, Type = MovementTypes.Adjust,
+                        Delta = p.Quantity - qty, QuantityAfter = p.Quantity, Reason = "Conferencia de estoque",
+                        OccurredAt = at, CreatedAt = at, CreatedBy = "seed" });
+                }
+                // historico existe ha 45 dias: a data de cadastro acompanha (a previsao usa os dias observados)
+                p.CreatedAt = start;
+                context.StockMovements.AddRange(moves);
+            }
             context.SaveChanges();
         }
     }
