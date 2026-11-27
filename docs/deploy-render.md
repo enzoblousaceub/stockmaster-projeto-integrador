@@ -2,6 +2,8 @@
 
 Guia para publicar o Stock Master na **sua própria conta** do Render. O Render lê o `render.yaml` na raiz do repositório e cria tudo (banco + site) de uma vez ("Blueprint").
 
+> **Atualização (26/11/2026):** o banco saiu do Render e foi para o Supabase Free, e o deploy passou a ser automático pelo CI. Para banco e deploy siga [`migracao-supabase.md`](migracao-supabase.md); este guia continua valendo para segredos, primeiro acesso e checagens pós-deploy.
+
 ## 1. Pré-requisitos
 1. Conta no [Render](https://render.com) (pode entrar com o GitHub).
 2. O código no **seu** repositório do GitHub (a branch que você quer publicar). O `git push` é feito por você; nada aqui faz push.
