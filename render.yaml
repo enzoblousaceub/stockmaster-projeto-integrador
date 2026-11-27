@@ -1,33 +1,27 @@
 # Blueprint do Stock Master (Render).
 #
-# ATENCAO - banco GRATUITO (apenas para validar o projeto):
-#   * expira 30 dias apos a criacao (14 dias de carencia; depois o Render APAGA o banco e os dados);
-#   * nao tem backup; so 1 Postgres gratuito por workspace.
-#   Antes de usar dados reais, troque `plan: free` por um plano pago (tem backup/PITR).
-# Fonte: https://render.com/docs/free#free-postgres
-databases:
-  - name: stockmaster-db
-    plan: free
-    region: oregon
-    databaseName: stockmaster
-    user: stockmaster
-
+# Banco: PostgreSQL no Supabase (plano Free), fora do Render. Ver docs/migracao-supabase.md.
+#   * O Postgres free do Render expira em 30 dias e foi descartado.
+#   * Use a URL do "Session pooler" do Supabase (porta 5432, usuario postgres.<ref>):
+#     a conexao direta do Supabase e so IPv6, e o Render nao sai por IPv6.
+#
+# Deploy: automatico pelo GitHub Actions (.github/workflows/ci.yml) via Deploy Hook,
+# so depois que build e testes passam na main. Por isso o auto-deploy do Render fica desligado.
 services:
   - type: web
     name: estoque-master
     runtime: docker
     plan: free
-    region: oregon          # mesma regiao do banco (URL interna)
+    region: oregon
+    autoDeploy: false        # quem publica e o CI (Deploy Hook), nunca um push sem testes
     healthCheckPath: /healthz
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
       - key: Seed__Enabled   # dados de demonstracao desligados em producao
         value: "false"
-      - key: DATABASE_URL    # URL interna do Render Postgres (postgresql://user:senha@host:5432/db)
-        fromDatabase:
-          name: stockmaster-db
-          property: connectionString
+      - key: DATABASE_URL    # Supabase Session pooler: postgresql://postgres.<ref>:<senha>@aws-0-<regiao>.pooler.supabase.com:5432/postgres
+        sync: false
       # --- Autenticacao: segredos preenchidos NO PAINEL do Render (sync: false = nunca vao para o repo) ---
       - key: Auth__AdminEmail     # e-mail do primeiro Admin (e o login dele). Contas antigas sem e-mail migram para ele
         sync: false
