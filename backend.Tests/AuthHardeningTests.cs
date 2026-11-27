@@ -129,7 +129,11 @@ public class AuthHardeningTests : IClassFixture<ApiFactory>
             first.PatchAsJsonAsync($"/api/users/{secondId}", new { perfil = "Visualizador" }),
             second.PatchAsJsonAsync($"/api/users/{firstId}", new { perfil = "Visualizador" }));
 
-        Assert.Contains(results, r => r.StatusCode == HttpStatusCode.Conflict);   // a segunda e barrada por last_admin
+        // Exatamente um rebaixamento vence. O outro e barrado: 409 last_admin (as duas leram "2 admins" ao mesmo tempo)
+        // ou 401 (o primeiro terminou antes e o rebaixamento revogou a sessao de quem fez a segunda requisicao).
+        var codes = results.Select(r => r.StatusCode).ToList();
+        Assert.Single(codes, c => c == HttpStatusCode.OK);
+        Assert.Single(codes, c => c is HttpStatusCode.Conflict or HttpStatusCode.Unauthorized);
         var admins = await Db(db => db.Users.CountAsync(u => u.IsActive && u.PasswordHash != null && u.Role == "Admin"), factory);
         Assert.Equal(1, admins);
     }
