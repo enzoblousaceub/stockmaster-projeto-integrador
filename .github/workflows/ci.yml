@@ -1,10 +1,12 @@
-# CI: so build e testes (sem deploy). O deploy e feito pelo Render.
+# CI/CD: build e testes em todo push/PR; na main, se tudo passar, publica no Render (Deploy Hook)
+# e espera o /healthz responder.
 name: CI
 
 on:
   push:
-    branches: [ main, master, 'refactor/**' ]
+    branches: [ main, master, 'refactor/**', 'infra/**' ]
   pull_request:
+  workflow_dispatch:     # permite rodar (e publicar, na main) manualmente pela aba Actions
 
 permissions:
   contents: read
@@ -40,3 +42,41 @@ jobs:
       - run: npm run build -- --configuration production
       - run: npm test -- --watch=false
       - run: npm audit --omit=dev
+
+  deploy:
+    # So publica a partir da main, e so se backend e frontend passaram
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    needs: [ backend, frontend ]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    concurrency:
+      group: deploy-render
+      cancel-in-progress: false   # nunca interrompe um deploy em andamento; o proximo espera na fila
+    env:
+      RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+      APP_URL: ${{ vars.APP_URL }}
+    steps:
+      - name: Disparar deploy no Render
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "::error::Secret RENDER_DEPLOY_HOOK_URL nao configurado (ver docs/migracao-supabase.md)"
+            exit 1
+          fi
+          # O hook publica o commit atual da branch configurada no Render (main)
+          curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL" -o /dev/null
+          echo "Deploy de ${GITHUB_SHA::7} solicitado ao Render."
+
+      - name: Aguardar o servico responder (/healthz)
+        if: env.APP_URL != ''
+        run: |
+          # Build do Docker no plano free leva alguns minutos; o servico antigo segue no ar ate o novo ficar saudavel.
+          sleep 60
+          for i in $(seq 1 40); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 "$APP_URL/healthz" || true)
+            echo "tentativa $i: HTTP $code"
+            if [ "$code" = "200" ]; then exit 0; fi
+            sleep 20
+          done
+          echo "::error::$APP_URL/healthz nao respondeu 200"
+          exit 1

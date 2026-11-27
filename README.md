@@ -135,7 +135,7 @@ newrepositorygithub/
 │   ├── src/app/core/         # autenticação, guards, interceptor, erros da API
 │   └── src/app/services/     # integração HTTP
 ├── docs/                     # deploy no Render, Resend, planejamento de IA
-└── .github/workflows/ci.yml  # build e testes (o deploy é feito pelo Render)
+└── .github/workflows/ci.yml  # build, testes e deploy automático no Render (main)
 ```
 
 ### Testes
@@ -156,10 +156,10 @@ cd frontend && npm test -- --watch=false
 
 ## ☁️ Deploy no Render
 
-O `render.yaml` cria o serviço web (Docker) e um Postgres ligado a ele via `DATABASE_URL`.
+O `render.yaml` cria o serviço web (Docker, plano Free). O banco é um **PostgreSQL no Supabase (plano Free)**, informado em `DATABASE_URL` (URL do *Session pooler*). O deploy é **automático pelo CI**: na `main`, com build e testes verdes, o workflow chama o Deploy Hook do Render. Passo a passo completo (criação do projeto, cópia dos dados, Deploy Hook): [`docs/migracao-supabase.md`](docs/migracao-supabase.md).
 
 > [!WARNING]
-> O Postgres do `render.yaml` está no plano **gratuito**, apenas para validação: **expira 30 dias após a criação** (14 dias de carência, depois o Render apaga o banco e os dados) e **não tem backup**. **Antes de usar dados reais, troque `plan: free` por um plano pago.**
+> No Supabase Free o projeto **pausa após 7 dias sem uso** (reative no painel; os dados ficam) e **não há backup automático**: faça `pg_dump` periódico (comando no guia).
 
 > [!NOTE]
 > **Atualização com movimentações:** a migration `StockMovementsCostImages` cria o histórico e registra o saldo atual de cada produto existente como um ajuste "Saldo anterior ao historico" (não conta como entrada nem como consumo). O custo dos produtos existentes começa em R$ 0,00: preencha na edição para os relatórios de margem e valor a custo ficarem corretos.
