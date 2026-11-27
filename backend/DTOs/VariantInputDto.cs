@@ -22,6 +22,14 @@ namespace backend.DTOs
 
         [Range(0, Limits.MaxValue)]
         public int MinStock { get; set; }
+
+        /// <summary>
+        /// Saldo que a tela mostrava ao abrir a edição (só para variações existentes). Com ele o servidor não apaga
+        /// vendas feitas enquanto o formulário estava aberto: quantidade igual ao esperado = não mexida (mantém o saldo
+        /// atual); diferente e o saldo mudou nesse meio tempo = 409 stock_changed. Nulo = grava a quantidade como veio.
+        /// </summary>
+        [Range(0, Limits.MaxValue)]
+        public int? ExpectedQuantity { get; set; }
     }
 
     public static class VariantRules

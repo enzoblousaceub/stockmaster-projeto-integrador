@@ -89,6 +89,9 @@ namespace backend.Controllers
             });
         }
 
+        /// <summary>Variação cujo saldo mudou entre abrir e salvar a edição.</summary>
+        public record StockConflict(int VariantId, string VariantLabel, int Expected, int Current);
+
         public record StockAlert(int ProductId, string ProductName, string? Brand, string Category, DateTime? ImageUpdatedAt,
             int VariantId, string VariantLabel, int Quantity, int MinStock);
 
@@ -223,6 +226,29 @@ namespace backend.Controllers
             if (grid.Any(g => g.Id is int gid && variants.All(v => v.Id != gid)))
                 errors["variants"] = "Variacao nao pertence a este produto.";
             if (errors.Count > 0) return VariantErrors(errors);
+
+            // saldo que a tela mostrava x saldo atual (linhas travadas): nunca sobrescreve venda feita no meio tempo
+            var conflicts = new List<StockConflict>();
+            foreach (var g in grid)
+            {
+                if (g.Id is not int gid || g.ExpectedQuantity is not int expected) continue;
+                var current = variants.First(v => v.Id == gid);
+                if (g.Quantity == expected) g.Quantity = current.Quantity;        // não mexida: mantém o saldo atual
+                else if (current.Quantity != expected)
+                    conflicts.Add(new StockConflict(gid, current.Label, expected, current.Quantity));
+            }
+            if (conflicts.Count > 0)
+            {
+                var pd = ProblemDetailsFactory.CreateProblemDetails(HttpContext, StatusCodes.Status409Conflict,
+                    "Estoque mudou", conflicts.Count == 1
+                        ? $"O saldo de {conflicts[0].VariantLabel} mudou de {conflicts[0].Expected} para {conflicts[0].Current} enquanto a tela estava aberta."
+                        : $"{conflicts.Count} tamanhos mudaram de saldo enquanto a tela estava aberta.");
+                pd.Extensions["code"] = "stock_changed";
+                pd.Extensions["conflicts"] = conflicts;
+                return new ConflictObjectResult(pd) { ContentTypes = { "application/problem+json" } };
+            }
+            if (grid.Sum(g => (long)g.Quantity) > Limits.MaxValue)
+                return VariantErrors(new Dictionary<string, string> { ["variants"] = $"O estoque total do produto nao pode passar de {Limits.MaxValue}." });
 
             var now = DateTime.UtcNow;
             product.Name = dto.Name;

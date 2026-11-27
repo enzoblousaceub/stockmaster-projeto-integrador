@@ -145,6 +145,75 @@ public class VariantsAndSalesTests : IClassFixture<ApiFactory>
         Assert.Equal(13, history.Sum(m => m.Delta));
     }
 
+    /// <summary>Grade como a tela de edição envia: quantidade digitada + saldo que ela mostrava ao abrir.</summary>
+    private static object[] EditGrid(GridProductResponse opened, Func<VariantResponse, int>? quantity = null) =>
+        opened.Variants.Select(v => (object)new
+        {
+            id = v.Id, size = v.Size, material = v.Material, minStock = v.MinStock,
+            quantity = quantity?.Invoke(v) ?? v.Quantity, expectedQuantity = v.Quantity
+        }).ToArray();
+
+    [Fact]
+    public async Task Edit_WithoutTouchingStock_KeepsSaleMadeWhileFormWasOpen()
+    {
+        var opened = await CreateGridAsync(q38: 5, q40: 3, qSarja: 2);
+        // a tela de edição abriu; nesse meio tempo o vendedor vendeu 2 do 38 Jeans
+        Assert.Equal(HttpStatusCode.Created, (await SellAsync(_admin, "Pix", (opened.Variants[0].Id, 2))).StatusCode);
+
+        // o dono só mudou o preço e salvou com os saldos que a tela mostrava
+        var put = await _admin.PutAsJsonAsync($"/api/products/{opened.Id}",
+            new { name = opened.Name, category = "Calças", price = 349.9m, variants = EditGrid(opened) });
+        Assert.Equal(HttpStatusCode.OK, put.StatusCode);
+
+        var after = (await GetAsync(opened.Id))!;
+        Assert.Equal(3, after.Variants[0].Quantity);   // a venda não foi apagada
+        Assert.Equal(8, after.Quantity);
+        Assert.DoesNotContain((await HistoryAsync(opened.Id))!, m => m.Reason == "Edicao do produto");
+    }
+
+    [Fact]
+    public async Task Edit_ChangingStockThatMovedMeanwhile_Returns409_AndChangesNothing()
+    {
+        var opened = await CreateGridAsync(q38: 5, q40: 3, qSarja: 2);
+        Assert.Equal(HttpStatusCode.Created, (await SellAsync(_admin, "Pix", (opened.Variants[0].Id, 2))).StatusCode);
+
+        // o dono contou 7 no 38 Jeans com a tela desatualizada (mostrava 5; agora são 3)
+        var put = await _admin.PutAsJsonAsync($"/api/products/{opened.Id}", new
+        {
+            name = "Nome novo", category = "Calças", price = 1,
+            variants = EditGrid(opened, v => v.Id == opened.Variants[0].Id ? 7 : v.Quantity)
+        });
+        Assert.Equal(HttpStatusCode.Conflict, put.StatusCode);
+        var problem = await put.ReadProblemAsync();
+        Assert.Equal("stock_changed", problem.Code);
+        var conflict = Assert.Single(problem.Raw.GetProperty("conflicts").EnumerateArray());
+        Assert.Equal(opened.Variants[0].Id, conflict.GetProperty("variantId").GetInt32());
+        Assert.Equal(5, conflict.GetProperty("expected").GetInt32());
+        Assert.Equal(3, conflict.GetProperty("current").GetInt32());
+
+        var after = (await GetAsync(opened.Id))!;
+        Assert.Equal(opened.Name, after.Name);
+        Assert.Equal(3, after.Variants[0].Quantity);
+    }
+
+    [Fact]
+    public async Task Edit_ChangingStockThatDidNotMove_IsSaved()
+    {
+        var opened = await CreateGridAsync(q38: 5, q40: 3, qSarja: 2);
+        // outra variação vendeu: não impede corrigir o 38 Jeans
+        await SellAsync(_admin, "Pix", (opened.Variants[1].Id, 1));
+        var put = await _admin.PutAsJsonAsync($"/api/products/{opened.Id}", new
+        {
+            name = opened.Name, category = "Calças", price = 1,
+            variants = EditGrid(opened, v => v.Id == opened.Variants[0].Id ? 9 : v.Quantity)
+        });
+        Assert.Equal(HttpStatusCode.OK, put.StatusCode);
+        var after = (await GetAsync(opened.Id))!;
+        Assert.Equal(9, after.Variants[0].Quantity);
+        Assert.Equal(2, after.Variants[1].Quantity);   // a venda do 40 continua
+        Assert.Contains((await HistoryAsync(opened.Id))!, m => m.Reason == "Edicao do produto" && m.Delta == 4);
+    }
+
     [Fact]
     public async Task Update_WithVariantOfAnotherProduct_Returns400()
     {

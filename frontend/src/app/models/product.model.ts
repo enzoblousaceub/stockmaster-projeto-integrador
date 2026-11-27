@@ -37,6 +37,8 @@ export interface VariantInput {
   material: string;
   quantity: number;
   minStock: number;
+  /** saldo que a tela mostrava ao abrir (edição): o servidor não apaga vendas feitas no meio tempo */
+  expectedQuantity?: number;
 }
 
 export interface CreateProduct {

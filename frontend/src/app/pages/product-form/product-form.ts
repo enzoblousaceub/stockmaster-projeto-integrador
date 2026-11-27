@@ -64,6 +64,8 @@ export class ProductFormComponent {
   readonly newMaterial = signal('');
   /** saldos de quando a tela abriu, para avisar quando tirar um tamanho que tem peças */
   private original = new Map<string, number>();
+  /** saldo de cada variação existente como a tela mostrou (vai junto ao salvar) */
+  private shownById = new Map<number, number>();
 
   // foto
   readonly imagePreview = signal<string | null>(null);
@@ -146,6 +148,7 @@ export class ProductFormComponent {
     this.hadImage = !!p.imageUpdatedAt;
     this.imagePreview.set(productImageUrl(p));
     this.original = new Map(p.variants.map((v) => [this.key(v.size, v.material), v.quantity]));
+    this.shownById = new Map(p.variants.map((v) => [v.id, v.quantity]));
     if (isSingle(p)) {
       const v = p.variants[0];
       this.hasGrid.set(false);
@@ -276,6 +279,33 @@ export class ProductFormComponent {
     return of(true);
   }
 
+  /**
+   * Houve venda (ou entrada) enquanto a tela estava aberta e o dono tinha mexido nas quantidades.
+   * Traz os saldos atuais para a grade, mantém o resto do que foi digitado e pede para conferir.
+   */
+  private refreshStock(): void {
+    const id = this.productId();
+    if (!id) return;
+    this.api.getProduct(id).subscribe({
+      next: (p) => {
+        this.original = new Map(p.variants.map((v) => [this.key(v.size, v.material), v.quantity]));
+        this.shownById = new Map(p.variants.map((v) => [v.id, v.quantity]));
+        this.cells.update((cells) => {
+          const next = { ...cells };
+          for (const v of p.variants) {
+            const k = this.key(v.size, v.material);
+            if (next[k]?.id === v.id) next[k] = { ...next[k], quantity: v.quantity };
+          }
+          return next;
+        });
+        const only = p.variants.length === 1 ? p.variants[0] : null;
+        if (only && this.single().id === only.id) this.single.update((c) => ({ ...c, quantity: only.quantity }));
+        this.snack.open('Houve venda enquanto você editava. As quantidades foram atualizadas com o estoque de agora: confira e salve de novo.', 'Fechar', { duration: 9000 });
+      },
+      error: () => this.snack.open('O estoque mudou enquanto você editava. Abra o produto de novo para ver os números atuais.', 'Fechar', { duration: 7000 })
+    });
+  }
+
   // ---------- salvar ----------
   save(): void {
     this.submitted.set(true);
@@ -292,7 +322,7 @@ export class ProductFormComponent {
       description: this.description().trim() || undefined,
       price: this.price() ?? 0,
       cost: this.cost() ?? 0,
-      variants: this.variants()
+      variants: this.variants().map((v) => (v.id && this.shownById.has(v.id) ? { ...v, expectedQuantity: this.shownById.get(v.id) } : v))
     };
     const id = this.productId();
     const save$ = id ? this.api.updateProduct(id, data) : this.api.createProduct(data);
@@ -305,6 +335,7 @@ export class ProductFormComponent {
       error: (err) => {
         this.saving.set(false);
         const p = parseProblem(err);
+        if (p.code === 'stock_changed') return this.refreshStock();
         const detail = p.errors ? Object.values(p.errors).flat()[0] : null;
         this.snack.open(detail ? `Não foi salvo: ${detail}` : 'Não foi salvo. Verifique a internet e tente de novo.', 'Fechar', { duration: 6000 });
       }
