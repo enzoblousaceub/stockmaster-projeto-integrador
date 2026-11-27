@@ -198,14 +198,19 @@ public class MovementsTests : IClassFixture<ApiFactory>
     }
 
     [Fact]
-    public async Task Operator_MovesStock_ButCannotEditProducts()
+    public async Task Operator_OnlySells_CannotMoveStockOrSeeReports()
     {
         var p = await CreateAsync(5);
         var op = await _factory.CreateUserClientAsync(_admin, $"op.{Guid.NewGuid():N}"[..12] + "@exemplo.com", "Operador");
 
-        Assert.Equal(HttpStatusCode.Created, (await MoveAsync(op, p.Id, new { type = "Saida", quantity = 1, reason = "Venda" })).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await op.PatchAsJsonAsync($"/api/products/{p.Id}/quantity", new { delta = 1 })).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await op.GetAsync("/api/reports/summary")).StatusCode);
+        // o funcionario do balcao consulta produtos e registra vendas (SalesController); o resto e do Admin
+        Assert.Equal(HttpStatusCode.OK, (await op.GetAsync($"/api/products/{p.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await MoveAsync(op, p.Id, new { type = "Saida", quantity = 1, reason = "Venda" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await MoveAsync(op, p.Id, new { type = "Entrada", quantity = 1 })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await op.PatchAsJsonAsync($"/api/products/{p.Id}/quantity", new { delta = 1 })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await op.GetAsync("/api/reports/summary")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await op.GetAsync("/api/movements")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await op.GetAsync($"/api/products/{p.Id}/movements")).StatusCode);
 
         Assert.Equal(HttpStatusCode.Forbidden, (await op.PostAsJsonAsync("/api/products",
             new { name = "x", category = "y", quantity = 1, price = 1, minStock = 0 })).StatusCode);

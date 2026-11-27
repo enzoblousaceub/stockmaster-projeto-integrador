@@ -18,6 +18,11 @@ namespace backend.Models
         [MaxLength(100)]
         public string Category { get; set; } = string.Empty;
 
+        /// <summary>Marca (opcional), ex.: Calvin Klein.</summary>
+        [MaxLength(100)]
+        public string? Brand { get; set; }
+
+        /// <summary>Saldo total: soma das variacoes (mantido pelo backend, nunca editado direto).</summary>
         [Range(0, Limits.MaxValue)]
         public int Quantity { get; set; }
 
@@ -28,8 +33,19 @@ namespace backend.Models
         [Range(typeof(decimal), "0", "1000000", ParseLimitsInInvariantCulture = true, ConvertValueInInvariantCulture = true)]
         public decimal Cost { get; set; }
 
+        /// <summary>Soma dos minimos das variacoes (mantido pelo backend; usado na previsao por produto).</summary>
         [Range(0, Limits.MaxValue)]
         public int MinStock { get; set; }
+
+        /// <summary>Grade de tamanhos/materiais, cada uma com saldo proprio.</summary>
+        public List<ProductVariant> Variants { get; set; } = new();
+
+        /// <summary>Recalcula os totais a partir das variacoes.</summary>
+        public void RecomputeTotals()
+        {
+            Quantity = Variants.Sum(v => v.Quantity);
+            MinStock = Variants.Sum(v => v.MinStock);
+        }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

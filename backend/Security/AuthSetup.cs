@@ -30,8 +30,10 @@ namespace backend.Security
     public static class AuthSetup
     {
         public const string AdminPolicy = "AdminOnly";
-        /// <summary>Movimentacao de estoque (entrada/saida/ajuste): Admin ou Operador.</summary>
-        public const string StockPolicy = "StockMovers";
+        /// <summary>Registrar (e desfazer) vendas no balcao: Admin ou Operador.</summary>
+        public const string SalesPolicy = "Sellers";
+        /// <summary>Relatorios e historico de movimentacoes: Admin ou Visualizador (o Operador so vende).</summary>
+        public const string ReportsPolicy = "ReportReaders";
         public const string XsrfCookie = "XSRF-TOKEN";
         public const string XsrfHeader = "X-XSRF-TOKEN";
         private const string StampClaim = "sm:stamp";
@@ -85,7 +87,8 @@ namespace backend.Security
                 // deny-by-default: tudo exige sessao, exceto o que tem [AllowAnonymous] explicito
                 o.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
                 o.AddPolicy(AdminPolicy, p => p.RequireAuthenticatedUser().RequireRole(Roles.Admin));
-                o.AddPolicy(StockPolicy, p => p.RequireAuthenticatedUser().RequireRole(Roles.Admin, Roles.Operator));
+                o.AddPolicy(SalesPolicy, p => p.RequireAuthenticatedUser().RequireRole(Roles.Admin, Roles.Operator));
+                o.AddPolicy(ReportsPolicy, p => p.RequireAuthenticatedUser().RequireRole(Roles.Admin, Roles.Viewer));
             });
 
             // chaves do Data Protection cifradas com Auth__KeyEncryptionKey (quem le o banco nao forja cookies)

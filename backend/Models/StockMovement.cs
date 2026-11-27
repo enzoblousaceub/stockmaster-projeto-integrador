@@ -22,6 +22,20 @@ namespace backend.Models
         /// <summary>Nome do produto no momento da movimentacao (continua legivel apos exclusao/renomeacao).</summary>
         public string ProductName { get; set; } = string.Empty;
 
+        /// <summary>Variacao movimentada; fica nula se a variacao (ou o produto) for removida.</summary>
+        public int? VariantId { get; set; }
+        public ProductVariant? Variant { get; set; }
+
+        /// <summary>Nome da variacao no momento (ex.: "40 · Jeans").</summary>
+        public string? VariantLabel { get; set; }
+
+        /// <summary>Venda a que a movimentacao pertence (saida da venda ou entrada que a desfez).</summary>
+        public long? SaleId { get; set; }
+        public Sale? Sale { get; set; }
+
+        /// <summary>Forma de pagamento (so nas movimentacoes de venda).</summary>
+        public string? PaymentMethod { get; set; }
+
         public string Type { get; set; } = MovementTypes.In;
 
         /// <summary>Variacao aplicada ao saldo: positiva na entrada, negativa na saida; no ajuste, o sinal indica o sentido.</summary>

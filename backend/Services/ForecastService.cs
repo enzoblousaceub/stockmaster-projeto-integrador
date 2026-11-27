@@ -49,11 +49,13 @@ namespace backend.Services
             var from = now.AddDays(-days);
 
             var products = await _db.Products.AsNoTracking().OrderBy(p => p.Name).ToListAsync(ct);
-            var moves = await _db.StockMovements.AsNoTracking()
+            // venda desfeita nao e consumo: a saida e a entrada que a desfez saem das contas
+            var valid = _db.StockMovements.AsNoTracking().Where(m => m.Sale == null || m.Sale.UndoneAt == null);
+            var moves = await valid
                 .Where(m => m.OccurredAt >= from && m.OccurredAt <= now)
                 .Select(m => new { m.ProductId, m.Type, m.Delta, m.OccurredAt })
                 .ToListAsync(ct);
-            var lastOut = await _db.StockMovements.AsNoTracking()
+            var lastOut = await valid
                 .Where(m => m.Type == MovementTypes.Out && m.ProductId != null)
                 .GroupBy(m => m.ProductId)
                 .Select(g => new { ProductId = g.Key!.Value, Last = g.Max(m => m.OccurredAt) })
