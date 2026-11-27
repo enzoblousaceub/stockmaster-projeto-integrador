@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, timeout } from 'rxjs';
-import { Product, CreateProduct, UpdateProduct, DashboardStats, Movement, MovementResult, NewMovement, ReportSummary } from '../models/product.model';
+import { Product, CreateProduct, UpdateProduct, DashboardStats, Movement, MovementResult, NewMovement, ReportSummary, StockAlert, Sale, NewSale } from '../models/product.model';
 
 @Injectable({
   providedIn: 'root'
@@ -32,8 +32,13 @@ export class ProductService {
   }
 
   /** Ajuste atômico de quantidade no servidor (sem lost update). 409 = fora de 0..1.000.000. */
-  adjustQuantity(id: number, delta: number): Observable<Product> {
-    return this.http.patch<Product>(`${this.apiUrl}/${id}/quantity`, { delta }).pipe(timeout(15000));
+  adjustQuantity(id: number, delta: number, variantId?: number): Observable<Product> {
+    return this.http.patch<Product>(`${this.apiUrl}/${id}/quantity`, { delta, variantId }).pipe(timeout(15000));
+  }
+
+  /** Variações zeradas ou no mínimo (zeradas primeiro). */
+  getAlerts(): Observable<StockAlert[]> {
+    return this.http.get<StockAlert[]>(`${this.apiUrl}/alerts`);
   }
 
   deleteProduct(id: number): Observable<void> {
@@ -72,6 +77,21 @@ export class ProductService {
 
   deleteImage(productId: number): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/${productId}/image`);
+  }
+
+  // ---------- vendas ----------
+  /** Venda inteira numa requisição: ou tudo sai do estoque, ou nada. */
+  createSale(sale: NewSale): Observable<Sale> {
+    return this.http.post<Sale>('/api/sales', sale).pipe(timeout(20000));
+  }
+
+  undoSale(id: number): Observable<Sale> {
+    return this.http.post<Sale>(`/api/sales/${id}/undo`, {}).pipe(timeout(20000));
+  }
+
+  /** Mais recentes primeiro (o funcionário recebe só as próprias). */
+  getSales(limit = 20): Observable<Sale[]> {
+    return this.http.get<Sale[]>('/api/sales', { params: { limit } });
   }
 
   // ---------- relatórios ----------

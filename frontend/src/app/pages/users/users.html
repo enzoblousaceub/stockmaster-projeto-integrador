@@ -1,11 +1,11 @@
 <div class="page">
   <header class="page-header">
     <div>
-      <h1>Usuários</h1>
-      <p class="subtitle">Gerencie quem acessa o sistema e com qual perfil</p>
+      <h1>Equipe</h1>
+      <p class="subtitle">Quem usa o sistema e o que cada pessoa pode fazer</p>
     </div>
     <button type="button" class="btn btn-primary btn-new" (click)="create()" id="btn-new-user">
-      <mat-icon aria-hidden="true">person_add</mat-icon><span>Novo usuário</span>
+      <mat-icon aria-hidden="true">person_add</mat-icon><span>Adicionar pessoa</span>
     </button>
   </header>
 
@@ -43,7 +43,7 @@
                     <div><b>{{ u.email }}</b><span>{{ isSelf(u) ? 'você' : (u.criadoPor ? 'criado por ' + u.criadoPor : '') }}</span></div>
                   </div>
                 </td>
-                <td><span class="chip" [class.chip-admin]="u.perfil === 'Admin'" [class.chip-view]="u.perfil !== 'Admin'">{{ u.perfil }}</span></td>
+                <td><span class="chip" [class.chip-admin]="u.perfil === 'Admin'" [class.chip-view]="u.perfil !== 'Admin'">{{ perfilNome[u.perfil] }}</span></td>
                 <td>
                   <span class="chip" [class.chip-on]="u.status === 'Ativo'" [class.chip-pend]="u.status === 'Pendente'" [class.chip-off]="u.status === 'Inativo'">{{ u.status }}</span>
                   @if (isLocked(u)) { <span class="chip chip-lock">Bloqueado até {{ u.bloqueadoAte | date: 'HH:mm' }}</span> }
@@ -98,7 +98,7 @@
               </div>
             </div>
             <div class="chips">
-              <span class="chip" [class.chip-admin]="u.perfil === 'Admin'" [class.chip-view]="u.perfil !== 'Admin'">{{ u.perfil }}</span>
+              <span class="chip" [class.chip-admin]="u.perfil === 'Admin'" [class.chip-view]="u.perfil !== 'Admin'">{{ perfilNome[u.perfil] }}</span>
               <span class="chip" [class.chip-on]="u.status === 'Ativo'" [class.chip-pend]="u.status === 'Pendente'" [class.chip-off]="u.status === 'Inativo'">{{ u.status }}</span>
               @if (isLocked(u)) { <span class="chip chip-lock">Bloqueado até {{ u.bloqueadoAte | date: 'HH:mm' }}</span> }
               @if (u.status === 'Pendente' && u.codigoExpiraEm) { <span class="hint">{{ codeHours(u) === 0 ? 'código expirado' : 'código expira em ' + codeHours(u) + ' h' }}</span> }

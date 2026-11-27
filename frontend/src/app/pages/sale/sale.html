@@ -1,0 +1,260 @@
+<div class="page sale">
+  <header class="page-header">
+    <div class="grow">
+      <h1>Vender</h1>
+      <p class="subtitle">Toque na peça, escolha o tamanho e ponha na sacola.</p>
+    </div>
+  </header>
+
+  <div class="search">
+    <mat-icon aria-hidden="true">search</mat-icon>
+    <label for="sale-search" class="sr-only">Procurar peça</label>
+    <input id="sale-search" class="input" type="search" placeholder="Procurar peça ou marca" autocomplete="off"
+      enterkeyhint="search" [value]="search()" (input)="search.set($any($event.target).value)">
+  </div>
+
+  @if (categories().length > 1) {
+    <div class="pills cats" role="group" aria-label="Filtrar por tipo de peça">
+      <button type="button" class="pill" [attr.aria-pressed]="category() === ''" (click)="category.set('')">Todas</button>
+      @for (c of categories(); track c) {
+        <button type="button" class="pill" [attr.aria-pressed]="category() === c" (click)="category.set(c)">{{ c }}</button>
+      }
+    </div>
+  }
+
+  @switch (state()) {
+    @case ('loading') {
+      <div class="grid" aria-busy="true">
+        @for (i of [1, 2, 3, 4]; track i) { <span class="sk tile-sk"></span> }
+      </div>
+    }
+    @case ('error') {
+      <div class="state-box" role="alert">
+        <mat-icon aria-hidden="true">wifi_off</mat-icon>
+        <h2>Não deu para carregar as peças</h2>
+        <p>Verifique a internet e tente de novo.</p>
+        <button type="button" class="btn btn-primary" (click)="load()">Tentar de novo</button>
+      </div>
+    }
+    @default {
+      @if (visible().length === 0) {
+        <div class="state-box">
+          <mat-icon aria-hidden="true">search_off</mat-icon>
+          <h2>Nenhuma peça encontrada</h2>
+          <p>Confira o nome ou escolha "Todas".</p>
+        </div>
+      } @else {
+        <ul class="grid" aria-label="Peças">
+          @for (p of visible(); track p.id) {
+            <li>
+              <button type="button" class="tile" [class.tile--out]="p.quantity === 0" (click)="open(p)"
+                [disabled]="p.quantity === 0" [id]="'tile-' + p.id">
+                @if (imageOf(p); as src) {
+                  <img class="tile-img" [src]="src" alt="" loading="lazy">
+                } @else {
+                  <span class="tile-img tile-mono"><app-garment [of]="p.category + ' ' + p.name" /></span>
+                }
+                <span class="tile-name">{{ p.name }}</span>
+                @if (p.brand) { <span class="tile-brand">{{ p.brand }}</span> }
+                <span class="tile-stock">
+                  @if (p.quantity === 0) { Esgotado } @else { {{ p.quantity }} {{ p.quantity === 1 ? 'peça' : 'peças' }} }
+                </span>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    }
+  }
+
+  @if (recent().length) {
+    <h2 class="section-title">Últimas vendas</h2>
+    <ul class="list">
+      @for (s of recent(); track s.id) {
+        <li class="list-row sale-row" [class.undone]="s.undoneAt">
+          <div class="grow">
+            <div class="title">{{ s.totalItems }} {{ s.totalItems === 1 ? 'peça' : 'peças' }}, {{ paymentLabel[s.paymentMethod] }}</div>
+            <div class="sub">
+{{ saleMeta(s) }}
+            </div>
+            <div class="sub items">
+              @for (i of s.items; track $index) {
+                <span>{{ i.quantity }}× {{ i.productName }} ({{ variantText(i.variantLabel) }})</span>
+              }
+            </div>
+          </div>
+          @if (remaining(s) > 0) {
+            <button type="button" class="btn btn-outline undo-btn" (click)="undo(s)" [disabled]="undoing()">
+              Desfazer <span class="num">{{ clock(remaining(s)) }}</span>
+            </button>
+          }
+        </li>
+      }
+    </ul>
+  }
+</div>
+
+<!-- barra da sacola: sempre à mão enquanto houver peças -->
+@if (bagCount() > 0 && !bagOpen()) {
+  <div class="bagbar">
+    <button type="button" class="btn btn-primary btn-lg btn-block" (click)="bagOpen.set(true)" id="btn-open-bag">
+      <mat-icon aria-hidden="true">shopping_bag</mat-icon>
+      <span>Ver sacola ({{ bagCount() }} {{ bagCount() === 1 ? 'peça' : 'peças' }})</span>
+    </button>
+  </div>
+}
+
+<!-- escolher tamanho -->
+@if (picking(); as p) {
+  <div class="scrim" (click)="closePick()" aria-hidden="true"></div>
+  <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="pick-title" (keydown.escape)="closePick()">
+    <div class="sheet-head">
+      @if (imageOf(p); as src) { <img class="thumb" [src]="src" alt=""> }
+      @else { <span class="thumb"><app-garment [of]="p.category + ' ' + p.name" /></span> }
+      <div class="grow">
+        <h2 id="pick-title">{{ p.name }}</h2>
+        @if (p.brand) { <p class="muted head-brand">{{ p.brand }}</p> }
+      </div>
+      <button type="button" class="icon-btn" (click)="closePick()" aria-label="Fechar" cdkFocusInitial>
+        <mat-icon aria-hidden="true">close</mat-icon>
+      </button>
+    </div>
+    <div class="sheet-body">
+      @if (!pickSingle()) {
+        @if (pickMaterials().length > 1) {
+          <p class="field-label">Material</p>
+          <div class="pills mats" role="group" aria-label="Material">
+            @for (m of pickMaterials(); track m) {
+              <button type="button" class="pill" [attr.aria-pressed]="pickMaterial() === m" (click)="chooseMaterial(m)">{{ m }}</button>
+            }
+          </div>
+        } @else if (pickMaterial()) {
+          <p class="muted">Material: {{ pickMaterial() }}</p>
+        }
+
+        <p class="field-label">Tamanho</p>
+        <div class="tag-row" role="group" aria-label="Tamanho">
+          @for (v of pickSizes(); track v.id) {
+            <button type="button" class="tag" [class.out]="free(v) === 0" [class.low]="free(v) > 0 && free(v) <= v.minStock"
+              [attr.aria-pressed]="pickVariant()?.id === v.id" [disabled]="free(v) === 0" (click)="chooseSize(v)"
+              [attr.aria-label]="'Tamanho ' + v.size + ', ' + (free(v) === 0 ? 'esgotado' : free(v) + ' disponíveis')">
+              <span class="tag-size">{{ v.size }}</span>
+              <span class="tag-qty">{{ free(v) === 0 ? 'esgotado' : free(v) + ' un.' }}</span>
+            </button>
+          }
+        </div>
+      }
+
+      @if (pickVariant(); as v) {
+        <div class="qty-line">
+          <span class="field-label">Quantidade</span>
+          <div class="stepper">
+            <button type="button" (click)="stepPick(-1)" [disabled]="pickQty() <= 1" aria-label="Menos uma"><mat-icon>remove</mat-icon></button>
+            <output aria-live="polite">{{ pickQty() }}</output>
+            <button type="button" (click)="stepPick(1)" [disabled]="pickQty() >= free(v)" aria-label="Mais uma"><mat-icon>add</mat-icon></button>
+          </div>
+        </div>
+        <p class="muted small">{{ free(v) }} {{ free(v) === 1 ? 'disponível' : 'disponíveis' }} neste tamanho.</p>
+      }
+    </div>
+    <div class="sheet-foot">
+      <button type="button" class="btn btn-primary btn-lg btn-block" [disabled]="!pickVariant() || free(pickVariant()!) === 0"
+        (click)="addToBag()" id="btn-add-bag">
+        <mat-icon aria-hidden="true">add_shopping_cart</mat-icon>
+        <span>{{ pickVariant() ? 'Pôr na sacola' : 'Escolha o tamanho' }}</span>
+      </button>
+    </div>
+  </section>
+}
+
+<!-- sacola -->
+@if (bagOpen()) {
+  <div class="scrim" (click)="bagOpen.set(false)" aria-hidden="true"></div>
+  <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="bag-title" (keydown.escape)="bagOpen.set(false)">
+    <div class="sheet-head">
+      <h2 id="bag-title">Sacola</h2>
+      <button type="button" class="icon-btn" (click)="bagOpen.set(false)" aria-label="Fechar sacola">
+        <mat-icon aria-hidden="true">close</mat-icon>
+      </button>
+    </div>
+    <div class="sheet-body">
+      <ul class="bag-list">
+        @for (i of bag(); track i.variantId) {
+          <li class="bag-item" [class.short]="short()[i.variantId] !== undefined">
+            @if (i.image) { <img class="thumb" [src]="i.image" alt=""> }
+            @else { <span class="thumb"><app-garment [of]="i.productName" /></span> }
+            <div class="grow">
+              <div class="bag-name">{{ i.productName }}</div>
+              <div class="muted">{{ itemText(i) }}</div>
+              @if (short()[i.variantId] !== undefined) {
+                <div class="short-msg">Só {{ short()[i.variantId] }} em estoque agora</div>
+              }
+            </div>
+            <div class="bag-acts">
+              <div class="stepper stepper--sm">
+                <button type="button" (click)="stepBag(i, -1)" [attr.aria-label]="i.qty === 1 ? 'Tirar da sacola' : 'Menos uma'">
+                  <mat-icon>{{ i.qty === 1 ? 'delete' : 'remove' }}</mat-icon>
+                </button>
+                <output>{{ i.qty }}</output>
+                <button type="button" (click)="stepBag(i, 1)" [disabled]="i.qty >= stockOf(i)" aria-label="Mais uma"><mat-icon>add</mat-icon></button>
+              </div>
+            </div>
+          </li>
+        }
+      </ul>
+
+      <p class="field-label pay-label" id="pay-label">Forma de pagamento</p>
+      <div class="pay" role="radiogroup" aria-labelledby="pay-label">
+        @for (m of payments; track m.value) {
+          <button type="button" class="pay-btn" role="radio" [attr.aria-checked]="payment() === m.value" (click)="payment.set(m.value)"
+            [id]="'pay-' + m.value">
+            <mat-icon aria-hidden="true">{{ m.icon }}</mat-icon>
+            <span>{{ m.label }}</span>
+          </button>
+        }
+      </div>
+    </div>
+    <div class="sheet-foot">
+      <button type="button" class="btn btn-success btn-lg btn-block" [disabled]="!payment() || sending()" (click)="confirm()" id="btn-confirm-sale">
+        <mat-icon aria-hidden="true">check</mat-icon>
+        <span>
+          @if (sending()) { Registrando… }
+          @else if (!payment()) { Escolha a forma de pagamento }
+          @else { Confirmar venda de {{ bagCount() }} {{ bagCount() === 1 ? 'peça' : 'peças' }} }
+        </span>
+      </button>
+      <div class="foot-row">
+        <button type="button" class="btn btn-ghost" (click)="bagOpen.set(false)">Adicionar mais peças</button>
+        <button type="button" class="btn btn-ghost danger" (click)="clearBag()">Esvaziar sacola</button>
+      </div>
+    </div>
+  </section>
+}
+
+<!-- venda registrada -->
+@if (done(); as s) {
+  <div class="scrim" (click)="closeDone()" aria-hidden="true"></div>
+  <section class="sheet done" role="dialog" aria-modal="true" aria-labelledby="done-title" (keydown.escape)="closeDone()">
+    <div class="sheet-body done-body">
+      <span class="done-mark" aria-hidden="true"><mat-icon>check</mat-icon></span>
+      <h2 id="done-title">Venda registrada</h2>
+      <p class="done-sub">{{ s.totalItems }} {{ s.totalItems === 1 ? 'peça' : 'peças' }}, pago no {{ paymentLabel[s.paymentMethod] }}</p>
+      <ul class="done-items">
+        @for (i of s.items; track $index) {
+          <li>{{ i.quantity }}× {{ i.productName }} <span class="muted">({{ variantText(i.variantLabel) }})</span></li>
+        }
+      </ul>
+    </div>
+    <div class="sheet-foot">
+      <button type="button" class="btn btn-primary btn-lg btn-block" (click)="closeDone()" id="btn-new-sale" cdkFocusInitial>
+        Nova venda
+      </button>
+      @if (remaining(s) > 0) {
+        <button type="button" class="btn btn-outline btn-block" (click)="undo(s)" [disabled]="undoing()" id="btn-undo-sale">
+          <mat-icon aria-hidden="true">undo</mat-icon>
+          <span>Desfazer esta venda (<span class="num">{{ clock(remaining(s)) }}</span>)</span>
+        </button>
+      }
+    </div>
+  </section>
+}

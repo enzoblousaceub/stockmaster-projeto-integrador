@@ -1,140 +1,185 @@
-<div class="page" [attr.aria-busy]="loading">
+<div class="page form-page">
   <header class="page-header">
-    <a class="back-btn" routerLink="/products" id="btn-back" aria-label="Voltar para a lista de produtos">
-      <mat-icon aria-hidden="true">arrow_back</mat-icon>
+    <a class="back-btn" [routerLink]="isEdit() ? ['/products', productId()] : '/products'" aria-label="Voltar sem salvar">
+      <mat-icon>arrow_back</mat-icon>
     </a>
-    <div>
-      <h1>{{ pageTitle }}</h1>
-      <p class="subtitle">{{ isEditMode ? 'Atualize as informações do item' : 'Adicione um novo item ao estoque' }}</p>
+    <div class="grow">
+      <h1>{{ isEdit() ? 'Editar produto' : 'Cadastrar produto' }}</h1>
     </div>
   </header>
 
-  <div class="layout">
-    <form id="product-form" class="fields" [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
-      <fieldset class="section" [disabled]="loading && isEditMode">
-        <legend>Identificação</legend>
-        <div class="grid">
-          <mat-form-field appearance="fill" subscriptSizing="dynamic">
-            <mat-label>Nome do produto</mat-label>
-            <input matInput formControlName="name" id="input-name" autocomplete="off" enterkeyhint="next" required>
-            @if (form.get('name')?.hasError('required')) { <mat-error>Informe o nome do produto</mat-error> }
-            @if (form.get('name')?.hasError('maxlength')) { <mat-error>Máximo de 200 caracteres</mat-error> }
-          </mat-form-field>
-
-          <mat-form-field appearance="fill" subscriptSizing="dynamic">
-            <mat-label>Categoria</mat-label>
-            <input matInput formControlName="category" id="input-category" list="category-options"
-              autocomplete="off" enterkeyhint="next" required>
-            <datalist id="category-options">
-              @for (c of categories; track c) { <option [value]="c"></option> }
-            </datalist>
-            @if (form.get('category')?.hasError('required')) { <mat-error>Informe a categoria</mat-error> }
-            @if (form.get('category')?.hasError('maxlength')) { <mat-error>Máximo de 100 caracteres</mat-error> }
-          </mat-form-field>
-
-          <mat-form-field appearance="fill" subscriptSizing="dynamic" class="span-2">
-            <mat-label>Descrição (opcional)</mat-label>
-            <textarea matInput formControlName="description" id="input-description" rows="3"></textarea>
-            @if (form.get('description')?.hasError('maxlength')) { <mat-error>Máximo de 500 caracteres</mat-error> }
-          </mat-form-field>
-        </div>
-      </fieldset>
-
-      <fieldset class="section" [disabled]="loading && isEditMode">
-        <legend>Preço e estoque</legend>
-        <div class="grid grid-2">
-          <mat-form-field appearance="fill" subscriptSizing="dynamic">
-            <mat-label>Preço (R$)</mat-label>
-            <input matInput type="number" inputmode="decimal" step="0.01" min="0" formControlName="price"
-              id="input-price" enterkeyhint="next" required>
-            @if (form.get('price')?.hasError('required')) { <mat-error>Informe o preço</mat-error> }
-            @if (form.get('price')?.hasError('min')) { <mat-error>O preço não pode ser negativo</mat-error> }
-            @if (form.get('price')?.hasError('max')) { <mat-error>Valor acima do permitido</mat-error> }
-            @if (form.get('price')?.hasError('decimals')) { <mat-error>Use no máximo 2 casas decimais</mat-error> }
-          </mat-form-field>
-
-          <mat-form-field appearance="fill" subscriptSizing="dynamic">
-            <mat-label>Custo (R$)</mat-label>
-            <input matInput type="number" inputmode="decimal" step="0.01" min="0" formControlName="cost"
-              id="input-cost" enterkeyhint="next" required>
-            <mat-hint>Quanto você paga por unidade</mat-hint>
-            @if (form.get('cost')?.hasError('required')) { <mat-error>Informe o custo (0 se não souber)</mat-error> }
-            @if (form.get('cost')?.hasError('min')) { <mat-error>O custo não pode ser negativo</mat-error> }
-            @if (form.get('cost')?.hasError('max')) { <mat-error>Valor acima do permitido</mat-error> }
-            @if (form.get('cost')?.hasError('decimals')) { <mat-error>Use no máximo 2 casas decimais</mat-error> }
-          </mat-form-field>
-
-          <mat-form-field appearance="fill" subscriptSizing="dynamic">
-            <mat-label>{{ isEditMode ? 'Quantidade em estoque' : 'Quantidade inicial' }}</mat-label>
-            <input matInput type="number" inputmode="numeric" step="1" min="0" formControlName="quantity"
-              id="input-quantity" enterkeyhint="next" required>
-            @if (isEditMode) { <mat-hint>Para mudar, use "Movimentar" na ficha do produto</mat-hint> }
-            @if (form.get('quantity')?.hasError('required')) { <mat-error>Informe a quantidade</mat-error> }
-            @if (form.get('quantity')?.hasError('min')) { <mat-error>A quantidade não pode ser negativa</mat-error> }
-            @if (form.get('quantity')?.hasError('max')) { <mat-error>Valor acima do permitido</mat-error> }
-          </mat-form-field>
-
-          <mat-form-field appearance="fill" subscriptSizing="dynamic">
-            <mat-label>Estoque mínimo</mat-label>
-            <input matInput type="number" inputmode="numeric" step="1" min="0" formControlName="minStock"
-              id="input-min-stock" enterkeyhint="done" required>
-            <mat-hint>Avisa quando a quantidade chegar a este nível</mat-hint>
-            @if (form.get('minStock')?.hasError('required')) { <mat-error>Informe o estoque mínimo</mat-error> }
-            @if (form.get('minStock')?.hasError('min')) { <mat-error>O mínimo não pode ser negativo</mat-error> }
-            @if (form.get('minStock')?.hasError('max')) { <mat-error>Valor acima do permitido</mat-error> }
-          </mat-form-field>
-        </div>
-      </fieldset>
-
-      <fieldset class="section">
-        <legend>Imagem</legend>
-        <div class="img-row">
-          <div class="img-box">
-            @if (imagePreview) { <img [src]="imagePreview" alt="Imagem do produto" width="96" height="96"> }
-            @else { <mat-icon aria-hidden="true">image</mat-icon> }
+  @if (loading()) {
+    <div aria-busy="true"><span class="sk"></span><span class="sk"></span><span class="sk"></span></div>
+  } @else {
+    <form (submit)="$event.preventDefault(); save()" novalidate>
+      <!-- foto -->
+      <section class="block" aria-labelledby="photo-title">
+        <h2 class="block-title" id="photo-title">Foto</h2>
+        <div class="photo-row">
+          <div class="photo-box">
+            @if (imagePreview(); as src) { <img [src]="src" alt="Foto escolhida"> }
+            @else { <mat-icon aria-hidden="true">photo_camera</mat-icon> }
           </div>
-          <div class="img-acts">
-            <label class="btn btn-outline" for="input-image">
-              <mat-icon aria-hidden="true">upload</mat-icon><span>{{ imagePreview ? 'Trocar imagem' : 'Escolher imagem' }}</span>
+          <div class="photo-acts">
+            <label class="btn btn-primary">
+              <mat-icon aria-hidden="true">photo_camera</mat-icon><span>Tirar foto</span>
+              <input type="file" accept="image/*" capture="environment" class="sr-only" (change)="onImage($any($event.target))">
             </label>
-            <input #img id="input-image" class="sr-only" type="file" accept="image/jpeg,image/png,image/webp" (change)="onImageSelected(img)">
-            @if (imagePreview) {
-              <button type="button" class="btn btn-outline" (click)="clearImage()" id="btn-remove-image">
-                <mat-icon aria-hidden="true">delete</mat-icon><span>Remover</span>
-              </button>
+            <label class="btn btn-outline">
+              <mat-icon aria-hidden="true">photo_library</mat-icon><span>Escolher da galeria</span>
+              <input type="file" accept="image/*" class="sr-only" (change)="onImage($any($event.target))">
+            </label>
+            @if (imagePreview()) {
+              <button type="button" class="btn btn-ghost danger" (click)="clearImage()">Tirar a foto</button>
             }
-            <span class="img-hint" [class.img-err]="imageError" role="status">{{ imageError || 'JPEG, PNG ou WebP, até 2 MB' }}</span>
           </div>
         </div>
-      </fieldset>
-    </form>
+        @if (imageBusy()) { <p class="muted" role="status">Preparando a foto…</p> }
+        @if (imageError()) { <p class="err" role="alert">{{ imageError() }}</p> }
+      </section>
 
-    <aside class="preview" [class.collapsed]="!previewOpen" aria-label="Pré-visualização do produto">
-      <button type="button" class="preview-toggle" (click)="previewOpen = !previewOpen"
-        [attr.aria-expanded]="previewOpen" aria-controls="preview-card" id="btn-preview">
-        <span>Pré-visualização</span>
-        <mat-icon aria-hidden="true">{{ previewOpen ? 'expand_less' : 'expand_more' }}</mat-icon>
-      </button>
-      <h2 class="preview-title">Pré-visualização</h2>
-      <div class="preview-card" id="preview-card">
-        @if (imagePreview) { <img class="preview-img" [src]="imagePreview" alt="" width="64" height="64"> }
-        <div class="preview-info">
-          <span class="preview-name">{{ form.get('name')?.value || 'Nome do produto' }}</span>
-          <span class="preview-category">{{ form.get('category')?.value || 'Categoria' }}</span>
-          <span class="preview-price num">{{ (form.get('price')?.value || 0) | currency: 'BRL' : 'symbol' : '1.2-2' }}</span>
-          @if (form.get('price')?.value > 0) {
-            <span class="preview-margin">Margem {{ ((form.get('price')?.value - (form.get('cost')?.value || 0)) / form.get('price')?.value) | percent: '1.0-1' }}</span>
-          }
+      <!-- dados -->
+      <section class="block" aria-labelledby="data-title">
+        <h2 class="block-title" id="data-title">Dados da peça</h2>
+        <div class="field">
+          <label for="f-name">Nome</label>
+          <input id="f-name" class="input" [class.invalid]="submitted() && errors()['name']" maxlength="200"
+            placeholder="Ex.: Calça jeans slim preta" [value]="name()" (input)="name.set($any($event.target).value)">
+          @if (submitted() && errors()['name']) { <span class="err">{{ errors()['name'] }}</span> }
         </div>
-      </div>
-    </aside>
+        <div class="row-2">
+          <div class="field">
+            <label for="f-brand">Marca <span class="opt">(se tiver)</span></label>
+            <input id="f-brand" class="input" maxlength="100" placeholder="Ex.: Calvin Klein" [value]="brand()" (input)="brand.set($any($event.target).value)">
+          </div>
+          <div class="field">
+            <label for="f-cat">Tipo de peça</label>
+            <input id="f-cat" class="input" list="cat-list" maxlength="100" [class.invalid]="submitted() && errors()['category']"
+              placeholder="Ex.: Calças" [value]="category()" (input)="category.set($any($event.target).value)">
+            <datalist id="cat-list">@for (c of categories(); track c) { <option [value]="c"></option> }</datalist>
+            @if (submitted() && errors()['category']) { <span class="err">{{ errors()['category'] }}</span> }
+          </div>
+        </div>
+        <div class="row-2">
+          <div class="field">
+            <label for="f-price">Preço de venda (R$)</label>
+            <input id="f-price" class="input" inputmode="decimal" placeholder="0,00" [class.invalid]="submitted() && errors()['price']"
+              [value]="priceText()" (input)="priceText.set($any($event.target).value)">
+            @if (submitted() && errors()['price']) { <span class="err">{{ errors()['price'] }}</span> }
+          </div>
+          <div class="field">
+            <label for="f-cost">Quanto você pagou (R$) <span class="opt">(opcional)</span></label>
+            <input id="f-cost" class="input" inputmode="decimal" placeholder="0,00" [class.invalid]="submitted() && errors()['cost']"
+              [value]="costText()" (input)="costText.set($any($event.target).value)">
+            @if (submitted() && errors()['cost']) { <span class="err">{{ errors()['cost'] }}</span> }
+          </div>
+        </div>
+        <div class="field">
+          <label for="f-desc">Observações <span class="opt">(opcional)</span></label>
+          <textarea id="f-desc" class="input" maxlength="500" rows="2" placeholder="Ex.: modelagem, tecido, detalhes"
+            [value]="description()" (input)="description.set($any($event.target).value)"></textarea>
+        </div>
+      </section>
 
-    <div class="actions" role="group" aria-label="Ações do formulário">
-      <a class="btn btn-outline" routerLink="/products" id="btn-cancel">Cancelar</a>
-      <button class="btn btn-primary" type="submit" form="product-form" [disabled]="loading" id="btn-submit">
-        <mat-icon aria-hidden="true">{{ isEditMode ? 'save' : 'check' }}</mat-icon>
-        <span>{{ isEditMode ? 'Salvar alterações' : 'Cadastrar produto' }}</span>
-      </button>
-    </div>
-  </div>
+      <!-- tamanhos -->
+      <section class="block" aria-labelledby="grid-title">
+        <h2 class="block-title" id="grid-title">Tamanhos e quantidades</h2>
+        <div class="seg" role="radiogroup" aria-label="A peça tem tamanhos?">
+          <button type="button" role="radio" [attr.aria-checked]="hasGrid()" (click)="hasGrid.set(true)">Tem tamanhos</button>
+          <button type="button" role="radio" [attr.aria-checked]="!hasGrid()" (click)="hasGrid.set(false)">Tamanho único</button>
+        </div>
+
+        @if (!hasGrid()) {
+          <div class="row-2 single">
+            <div class="field">
+              <label for="f-sq">Peças na loja</label>
+              <input id="f-sq" class="input" type="number" inputmode="numeric" min="0" [value]="single().quantity" (input)="setSingle('quantity', $any($event.target).valueAsNumber)">
+            </div>
+            <div class="field">
+              <label for="f-sm">Avisar quando tiver</label>
+              <input id="f-sm" class="input" type="number" inputmode="numeric" min="0" [value]="single().minStock" (input)="setSingle('minStock', $any($event.target).valueAsNumber)">
+            </div>
+          </div>
+        } @else {
+          <p class="field-label">1. Quais tamanhos?</p>
+          <div class="pills presets" role="group" aria-label="Atalhos de tamanhos">
+            @for (p of presets; track p.label) {
+              <button type="button" class="pill" (click)="applyPreset(p.sizes)">+ {{ p.label }}</button>
+            }
+          </div>
+          <div class="add-row">
+            <label for="f-size" class="sr-only">Outro tamanho</label>
+            <input id="f-size" class="input" maxlength="20" placeholder="Outro tamanho (ex.: 48, XG)" [value]="newSize()"
+              (input)="newSize.set($any($event.target).value)" (keydown.enter)="$event.preventDefault(); addSize()">
+            <button type="button" class="btn btn-outline" (click)="addSize()">Adicionar</button>
+          </div>
+          @if (sizes().length) {
+            <ul class="chosen" aria-label="Tamanhos escolhidos">
+              @for (s of sizes(); track s) {
+                <li><span>{{ s }}</span><button type="button" (click)="removeSize(s)" [attr.aria-label]="'Tirar o tamanho ' + s"><mat-icon>close</mat-icon></button></li>
+              }
+            </ul>
+          }
+          @if (submitted() && errors()['sizes']) { <p class="err">{{ errors()['sizes'] }}</p> }
+
+          <p class="field-label">2. Tem materiais diferentes? <span class="opt">(opcional)</span></p>
+          <p class="muted help">Ex.: a mesma calça em Jeans e em Sarja. Se for um só, pode deixar em branco.</p>
+          <div class="add-row">
+            <label for="f-mat" class="sr-only">Material</label>
+            <input id="f-mat" class="input" maxlength="40" placeholder="Material (ex.: Jeans)" [value]="newMaterial()"
+              (input)="newMaterial.set($any($event.target).value)" (keydown.enter)="$event.preventDefault(); addMaterial()">
+            <button type="button" class="btn btn-outline" (click)="addMaterial()">Adicionar</button>
+          </div>
+          @if (materials().length) {
+            <ul class="chosen" aria-label="Materiais escolhidos">
+              @for (m of materials(); track m) {
+                <li><span>{{ m }}</span><button type="button" (click)="removeMaterial(m)" [attr.aria-label]="'Tirar o material ' + m"><mat-icon>close</mat-icon></button></li>
+              }
+            </ul>
+          }
+
+          @if (sizes().length) {
+            <p class="field-label">3. Quantas peças tem de cada?</p>
+            @for (m of mats(); track m) {
+              <div class="qty-block">
+                @if (m) { <h3 class="qty-title">{{ m }}</h3> }
+                <div class="qty-head" aria-hidden="true"><span>Tamanho</span><span>Peças</span><span>Avisar com</span></div>
+                @for (s of sizes(); track s) {
+                  <div class="qty-row">
+                    <span class="tag static qty-tag"><span class="tag-size">{{ s }}</span></span>
+                    <div class="stepper">
+                      <button type="button" (click)="stepCell(s, m, -1)" [disabled]="cell(s, m).quantity === 0" [attr.aria-label]="'Menos uma no ' + s + ' ' + m"><mat-icon>remove</mat-icon></button>
+                      <input type="number" inputmode="numeric" min="0" [value]="cell(s, m).quantity" (focus)="$any($event.target).select()"
+                        (input)="setCell(s, m, 'quantity', $any($event.target).valueAsNumber)" [attr.aria-label]="'Peças no tamanho ' + s + ' ' + m">
+                      <button type="button" (click)="stepCell(s, m, 1)" [attr.aria-label]="'Mais uma no ' + s + ' ' + m"><mat-icon>add</mat-icon></button>
+                    </div>
+                    <input class="input min-input" type="number" inputmode="numeric" min="0" [value]="cell(s, m).minStock" (focus)="$any($event.target).select()"
+                      (input)="setCell(s, m, 'minStock', $any($event.target).valueAsNumber)" [attr.aria-label]="'Avisar quando o ' + s + ' ' + m + ' tiver'">
+                  </div>
+                }
+              </div>
+            }
+            <p class="muted help">"Avisar com": quando o tamanho chegar nesse número, ele aparece em "Precisa repor".</p>
+          }
+        }
+
+        @if (removedStock() > 0) {
+          <p class="warn" role="status">
+            <mat-icon aria-hidden="true">warning</mat-icon>
+            Você tirou tamanhos que tinham {{ removedStock() }} {{ removedStock() === 1 ? 'peça' : 'peças' }}. Ao salvar, elas saem do estoque.
+          </p>
+        }
+      </section>
+
+      <div class="savebar">
+        <button type="submit" class="btn btn-primary btn-lg btn-block" [disabled]="saving() || imageBusy()" id="btn-save-product">
+          <mat-icon aria-hidden="true">check</mat-icon>
+          <span>
+            @if (saving()) { Salvando… }
+            @else { {{ isEdit() ? 'Salvar alterações' : 'Cadastrar produto' }} ({{ total() }} {{ total() === 1 ? 'peça' : 'peças' }}) }
+          </span>
+        </button>
+      </div>
+    </form>
+  }
 </div>

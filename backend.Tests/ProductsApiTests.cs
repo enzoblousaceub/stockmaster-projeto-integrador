@@ -123,11 +123,15 @@ public class ProductsApiTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task Stats_AreConsistentWithProducts()
     {
-        var list = await _client.GetFromJsonAsync<List<ProductResponse>>("/api/products");
+        var list = await _client.GetFromJsonAsync<List<GridProductResponse>>("/api/products");
         var stats = await _client.GetFromJsonAsync<StatsResponse>("/api/products/stats");
         Assert.Equal(list!.Count, stats!.TotalProducts);
         Assert.Equal(list.Sum(p => p.Quantity), stats.TotalItems);
-        Assert.Equal(list.Count(p => p.Quantity == 0), stats.OutOfStockCount);
+        // alertas contam por variacao ("40 Jeans esgotado" e um alerta)
+        var variants = list.SelectMany(p => p.Variants).ToList();
+        Assert.Equal(variants.Count(v => v.Quantity == 0), stats.OutOfStockCount);
+        Assert.Equal(variants.Count(v => v.Quantity > 0 && v.Quantity <= v.MinStock), stats.LowStockCount);
+        Assert.All(list, p => Assert.Equal(p.Variants.Sum(v => v.Quantity), p.Quantity));
     }
 
     [Fact]

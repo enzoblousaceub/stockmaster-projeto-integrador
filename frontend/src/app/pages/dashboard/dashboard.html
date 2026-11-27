@@ -1,149 +1,141 @@
 <div class="page">
   <header class="page-header">
-    <div>
-      <h1>Dashboard</h1>
-      <p class="subtitle">Visão geral do estoque e itens que precisam de atenção</p>
+    <div class="grow">
+      <h1>{{ greeting }}, {{ name() }}</h1>
+      <p class="subtitle">{{ today | date: "EEEE, d 'de' MMMM" }}</p>
     </div>
-    @if (canWrite()) {
-      <a class="btn-primary" routerLink="/products/new" id="btn-add-product">
-      <mat-icon aria-hidden="true">add</mat-icon>
-      <span>Novo produto</span>
-    </a>
-    }
   </header>
 
-  <div class="sr-only" role="status" aria-live="polite">{{ liveMessage() }}</div>
+  @if (auth.isAdmin()) {
+    <nav class="actions" aria-label="Atalhos">
+      <a class="action action--main" routerLink="/vender" id="act-sell">
+        <mat-icon aria-hidden="true">shopping_bag</mat-icon>
+        <span>Registrar venda</span>
+      </a>
+      <a class="action" routerLink="/products" [queryParams]="{ modo: 'entrada' }" id="act-arrival">
+        <mat-icon aria-hidden="true">local_shipping</mat-icon>
+        <span>Chegou mercadoria</span>
+      </a>
+      <a class="action" routerLink="/products/new" id="act-new">
+        <mat-icon aria-hidden="true">add_a_photo</mat-icon>
+        <span>Cadastrar produto</span>
+      </a>
+    </nav>
+  }
 
   @switch (state()) {
     @case ('loading') {
-      <div class="kpis" aria-hidden="true">
-        @for (i of [1, 2, 3, 4]; track i) {
-          <div class="kpi skeleton" aria-hidden="true"><span class="sk sk-l"></span><span class="sk sk-v"></span></div>
-        }
-      </div>
-      <div class="panels" aria-hidden="true">
-        <div class="panel skeleton"><span class="sk sk-t"></span><span class="sk sk-row"></span><span class="sk sk-row"></span><span class="sk sk-row"></span></div>
-        <div class="panel skeleton"><span class="sk sk-t"></span><span class="sk sk-row"></span><span class="sk sk-row"></span><span class="sk sk-row"></span></div>
-      </div>
+      <div aria-busy="true"><span class="sk"></span><span class="sk"></span><span class="sk"></span></div>
     }
-
     @case ('error') {
       <div class="state-box" role="alert">
-        <mat-icon aria-hidden="true">cloud_off</mat-icon>
-        <h2>Não foi possível carregar o dashboard</h2>
-        <p>Verifique sua conexão e tente novamente.</p>
-        <button type="button" class="btn-primary" (click)="load()" id="btn-retry">
-          <mat-icon aria-hidden="true">refresh</mat-icon>
-          <span>Tentar novamente</span>
-        </button>
+        <mat-icon aria-hidden="true">wifi_off</mat-icon>
+        <h2>Não deu para carregar o resumo</h2>
+        <p>Verifique a internet e tente de novo.</p>
+        <button type="button" class="btn btn-primary" (click)="load()">Tentar de novo</button>
       </div>
     }
-
-    @case ('ready') {
-      @if (products().length === 0) {
+    @default {
+      @if (stats()?.totalProducts === 0) {
         <div class="state-box">
-          <mat-icon aria-hidden="true">inventory_2</mat-icon>
-          <h2>Seu estoque está vazio</h2>
-          <p>Cadastre o primeiro produto para ver indicadores e alertas aqui.</p>
-          @if (canWrite()) {
-            <a class="btn-primary" routerLink="/products/new">
-            <mat-icon aria-hidden="true">add</mat-icon>
-            <span>Cadastrar primeiro produto</span>
-          </a>
-          }
+          <mat-icon aria-hidden="true">checkroom</mat-icon>
+          <h2>Nenhum produto cadastrado ainda</h2>
+          <p>Cadastre a primeira peça com foto e tamanhos para começar a vender.</p>
+          @if (auth.isAdmin()) { <a class="btn btn-primary" routerLink="/products/new">Cadastrar produto</a> }
         </div>
       } @else {
-        <section class="kpis" aria-label="Indicadores">
-          <div class="kpi" id="stat-total-products">
-            <span class="kpi-label"><mat-icon aria-hidden="true">inventory_2</mat-icon>Produtos</span>
-            <span class="kpi-value num">{{ stats()?.totalProducts | number }}</span>
-            <span class="kpi-sub">{{ stats()?.categories }} categorias</span>
-          </div>
-          <div class="kpi" id="stat-total-items">
-            <span class="kpi-label"><mat-icon aria-hidden="true">widgets</mat-icon>Itens em estoque</span>
-            <span class="kpi-value num">{{ stats()?.totalItems | number }}</span>
-            <span class="kpi-sub">unidades no total</span>
-          </div>
-          <div class="kpi" id="stat-total-value">
-            <span class="kpi-label"><mat-icon aria-hidden="true">payments</mat-icon>Valor em estoque</span>
-            <span class="kpi-value num">{{ stats()?.totalValue | currency: 'BRL' : 'symbol' : '1.2-2' }}</span>
-            <span class="kpi-sub">a preço de venda · <span class="num">{{ stats()?.totalCost | currency: 'BRL' : 'symbol' : '1.0-0' }}</span> a custo</span>
-          </div>
-          <div class="kpi" [class.kpi--alert]="alertCount() > 0" [class.kpi--ok]="alertCount() === 0" id="stat-alerts">
-            <span class="kpi-label">
-              <mat-icon aria-hidden="true">{{ alertCount() > 0 ? 'warning' : 'check_circle' }}</mat-icon>Alertas
-            </span>
-            <span class="kpi-value num">{{ alertCount() }}</span>
-            <span class="kpi-sub">{{ stats()?.outOfStockCount }} esgotados · {{ stats()?.lowStockCount }} baixos</span>
-          </div>
-        </section>
-
-        <div class="panels">
-          <section class="panel" aria-labelledby="h-restock" id="restock-panel">
-            <div class="panel-head">
-              <h2 id="h-restock">Precisa de reposição</h2>
-              @if (alerts().length > 0) {
-                <a class="link" routerLink="/reports">Ver reposição sugerida</a>
-              }
-            </div>
-
-            @if (alerts().length === 0) {
-              <div class="panel-empty">
-                <mat-icon aria-hidden="true">check_circle</mat-icon>
-                <p><strong>Tudo em dia.</strong> Nenhum item abaixo do estoque mínimo.</p>
-              </div>
-            } @else {
-              <ul class="restock-list">
-                @for (p of topAlerts(); track p.id) {
-                  <li class="restock-item">
-                    <div class="restock-main">
-                      <a class="restock-name" [routerLink]="['/products', p.id]">{{ p.name }}</a>
-                      <span class="restock-meta">
-                        {{ p.category }} ·
-                        <span class="num">{{ p.quantity }}</span> em estoque, mínimo
-                        <span class="num">{{ p.minStock }}</span>
-                      </span>
-                    </div>
-                    <span class="chip" [class.chip--danger]="isOut(p)" [class.chip--warning]="!isOut(p)">
-                      {{ isOut(p) ? 'Esgotado' : 'Baixo' }}
-                    </span>
-                    @if (canMove()) {
-                      <button type="button" class="btn-outline" #rep (click)="restock(p, rep)" [attr.aria-label]="'Registrar entrada de ' + p.name">
-                        <mat-icon aria-hidden="true">add_shopping_cart</mat-icon>
-                        <span>Repor</span>
-                      </button>
-                    }
-                  </li>
+        @if (auth.canSell()) {
+          <section aria-labelledby="today-title">
+            <h2 class="section-title" id="today-title">Hoje</h2>
+            <div class="today">
+              <p class="today-line">
+                @if (todaySales().length === 0) {
+                  Nenhuma venda ainda hoje.
+                } @else {
+                  <b class="num">{{ todaySales().length }}</b> {{ todaySales().length === 1 ? 'venda' : 'vendas' }},
+                  <b class="num">{{ todayPieces() }}</b> {{ todayPieces() === 1 ? 'peça vendida' : 'peças vendidas' }}
                 }
-              </ul>
-              @if (alerts().length > topAlerts().length) {
-                <p class="more">E mais {{ alerts().length - topAlerts().length }} {{ alerts().length - topAlerts().length === 1 ? 'item' : 'itens' }} abaixo do mínimo.</p>
+              </p>
+              @if (todaySales().length) {
+                <ul class="list">
+                  @for (s of todaySales().slice(0, 4); track s.id) {
+                    <li class="list-row">
+                      <span class="time num">{{ s.createdAt | date: 'HH:mm' }}</span>
+                      <div class="grow">
+                        <div class="title">
+                          @for (i of s.items; track $index; let last = $last) {
+                            <span>{{ i.quantity }}× {{ i.productName }}{{ last ? '' : ', ' }}</span>
+                          }
+                        </div>
+                        <div class="sub">{{ saleSub(s) }}</div>
+                      </div>
+                    </li>
+                  }
+                </ul>
               }
-            }
-          </section>
-
-          <section class="panel" aria-labelledby="h-cat">
-            <div class="panel-head">
-              <h2 id="h-cat">Estoque por categoria</h2>
-              <span class="panel-note">unidades</span>
             </div>
-            <ul class="bars">
-              @for (c of categories(); track c.name) {
-                <li class="bar-row">
-                  <div class="bar-label">
-                    <span class="bar-name">{{ c.name }}</span>
-                    <span class="bar-val num">{{ c.items | number }}</span>
-                  </div>
-                  <div class="bar-track" aria-hidden="true"><div class="bar-fill" [style.width.%]="c.percent"></div></div>
-                  <span class="bar-sub">
-                    {{ c.products }} {{ c.products === 1 ? 'produto' : 'produtos' }} ·
-                    {{ c.value | currency: 'BRL' : 'symbol' : '1.2-2' }}
-                  </span>
+          </section>
+        }
+
+        <section aria-labelledby="alerts-title">
+          <h2 class="section-title" id="alerts-title">Precisa repor</h2>
+          @if (alerts().length === 0) {
+            <p class="ok-line"><mat-icon aria-hidden="true">check_circle</mat-icon> Todos os tamanhos estão acima do mínimo.</p>
+          } @else {
+            <p class="muted lead">
+              {{ outCount() }} {{ outCount() === 1 ? 'tamanho esgotado' : 'tamanhos esgotados' }}
+              e {{ alerts().length - outCount() }} no mínimo.
+            </p>
+            <ul class="list">
+              @for (a of visibleAlerts(); track a.variantId) {
+                <li>
+                  <a class="list-row" [routerLink]="['/products', a.productId]">
+                    @if (image(a); as src) { <img class="thumb" [src]="src" alt=""> }
+                    @else { <span class="thumb"><app-garment [of]="a.category + ' ' + a.productName" /></span> }
+                    <div class="grow">
+                      <div class="title">{{ a.productName }}</div>
+                      <div class="sub">{{ variantText(a.variantLabel) === 'Único' ? 'Tamanho único' : 'Tamanho ' + variantText(a.variantLabel) }}</div>
+                    </div>
+                    <span class="end">
+                      @if (a.quantity === 0) { <span class="chip chip--out">Esgotado</span> }
+                      @else { <span class="chip chip--low">Restam {{ a.quantity }}</span> }
+                    </span>
+                  </a>
                 </li>
               }
             </ul>
+            @if (alerts().length > 6) {
+              <button type="button" class="btn btn-ghost more" (click)="showAllAlerts.set(!showAllAlerts())">
+                {{ showAllAlerts() ? 'Mostrar menos' : 'Mostrar todos (' + alerts().length + ')' }}
+              </button>
+            }
+          }
+        </section>
+
+        @if (stats(); as s) {
+          <section aria-labelledby="stock-title">
+            <h2 class="section-title" id="stock-title">Estoque</h2>
+            <div class="kpis">
+              <div class="kpi">
+                <span class="kpi-label">Peças na loja</span>
+                <span class="kpi-value">{{ s.totalItems | number: '1.0-0' : 'pt-BR' }}</span>
+                <span class="kpi-sub">{{ s.totalProducts }} produtos</span>
+              </div>
+              <div class="kpi">
+                <span class="kpi-label">Valor de venda</span>
+                <span class="kpi-value">{{ s.totalValue | currency: 'BRL' : 'symbol' : '1.0-0' : 'pt-BR' }}</span>
+                <span class="kpi-sub">se vender tudo</span>
+              </div>
+              @if (auth.isAdmin()) {
+                <div class="kpi">
+                  <span class="kpi-label">Custo pago</span>
+                  <span class="kpi-value">{{ s.totalCost | currency: 'BRL' : 'symbol' : '1.0-0' : 'pt-BR' }}</span>
+                  <span class="kpi-sub">o que você investiu</span>
+                </div>
+              }
+            </div>
           </section>
-        </div>
+        }
       }
     }
   }

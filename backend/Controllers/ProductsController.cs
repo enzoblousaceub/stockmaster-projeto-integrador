@@ -32,17 +32,22 @@ namespace backend.Controllers
         /// <summary>Identificacao curta do produto para a auditoria (mesmo codigo exibido no front, RF002).</summary>
         private static string Label(Product p) => $"#{p.Id:D4} {p.Name}";
 
+        /// <summary>Produtos com a grade em ordem de cadastro.</summary>
+        private IQueryable<Product> WithVariants() =>
+            _context.Products.Include(p => p.Variants.OrderBy(v => v.SortOrder).ThenBy(v => v.Id));
+
         // GET: api/products
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Product>>> GetProducts([FromQuery, MaxLength(Limits.MaxQueryLength)] string? search, [FromQuery, MaxLength(Limits.MaxQueryLength)] string? category)
         {
-            var query = _context.Products.AsQueryable();
+            var query = WithVariants().AsNoTracking();
 
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var pattern = $"%{EscapeLike(search.Trim())}%";
                 query = query.Where(p =>
                     EF.Functions.ILike(p.Name, pattern, "\\") ||
+                    (p.Brand != null && EF.Functions.ILike(p.Brand, pattern, "\\")) ||
                     (p.Description != null && EF.Functions.ILike(p.Description, pattern, "\\")));
             }
 
@@ -58,17 +63,18 @@ namespace backend.Controllers
         private static string EscapeLike(string value) =>
             value.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
 
-        // GET: api/products/stats
+        // GET: api/products/stats  (alertas contados por variacao: "40 Jeans acabando" e um alerta)
         [HttpGet("stats")]
         public async Task<ActionResult<object>> GetStats()
         {
-            var products = await _context.Products.ToListAsync();
+            var products = await _context.Products.AsNoTracking().ToListAsync();
+            var variants = await _context.ProductVariants.AsNoTracking().ToListAsync();
             var totalProducts = products.Count;
             var totalItems = products.Sum(p => (long)p.Quantity);
             var totalValue = products.Sum(p => p.Quantity * p.Price);
             var totalCost = products.Sum(p => p.Quantity * p.Cost);
-            var lowStockCount = products.Count(p => p.Quantity > 0 && p.Quantity <= p.MinStock);
-            var outOfStockCount = products.Count(p => p.Quantity == 0);
+            var lowStockCount = variants.Count(v => v.Quantity > 0 && v.Quantity <= v.MinStock);
+            var outOfStockCount = variants.Count(v => v.Quantity == 0);
             var categories = products.Select(p => p.Category).Distinct().Count();
 
             return Ok(new
@@ -81,6 +87,26 @@ namespace backend.Controllers
                 outOfStockCount,
                 categories
             });
+        }
+
+        /// <summary>Variação cujo saldo mudou entre abrir e salvar a edição.</summary>
+        public record StockConflict(int VariantId, string VariantLabel, int Expected, int Current);
+
+        public record StockAlert(int ProductId, string ProductName, string? Brand, string Category, DateTime? ImageUpdatedAt,
+            int VariantId, string VariantLabel, int Quantity, int MinStock);
+
+        // GET: api/products/alerts  (variacoes zeradas ou no minimo, zeradas primeiro)
+        [HttpGet("alerts")]
+        public async Task<ActionResult<IEnumerable<StockAlert>>> GetAlerts(CancellationToken ct)
+        {
+            var rows = await (from v in _context.ProductVariants.AsNoTracking()
+                              join p in _context.Products.AsNoTracking() on v.ProductId equals p.Id
+                              where v.Quantity == 0 || v.Quantity <= v.MinStock
+                              select new { p, v }).ToListAsync(ct);
+            return Ok(rows
+                .OrderBy(r => r.v.Quantity > 0).ThenBy(r => r.p.Name).ThenBy(r => r.v.SortOrder)
+                .Select(r => new StockAlert(r.p.Id, r.p.Name, r.p.Brand, r.p.Category, r.p.ImageUpdatedAt, r.v.Id,
+                    r.v.Label, r.v.Quantity, r.v.MinStock)));
         }
 
         // GET: api/products/categories
@@ -100,7 +126,7 @@ namespace backend.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<Product>> GetProduct(int id)
         {
-            var product = await _context.Products.FindAsync(id);
+            var product = await WithVariants().AsNoTracking().FirstOrDefaultAsync(p => p.Id == id);
 
             if (product == null)
             {
@@ -110,29 +136,63 @@ namespace backend.Controllers
             return product;
         }
 
+        /// <summary>Grade enviada, ou a variacao unica de compatibilidade (Quantity/MinStock) quando nao vier.</summary>
+        private static List<VariantInputDto> GridOf(List<VariantInputDto>? variants, int quantity, int minStock) =>
+            variants is null
+                ? new() { new VariantInputDto { Size = ProductVariant.DefaultSize, Quantity = quantity, MinStock = minStock } }
+                : variants;
+
+        private ActionResult VariantErrors(Dictionary<string, string> errors)
+        {
+            foreach (var (k, v) in errors) ModelState.AddModelError(k, v);
+            var pd = ProblemDetailsFactory.CreateValidationProblemDetails(HttpContext, ModelState);
+            pd.Extensions["code"] = "validation_error";
+            return new BadRequestObjectResult(pd) { ContentTypes = { "application/problem+json" } };
+        }
+
+        private static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+
         // POST: api/products
         [Authorize(Policy = AuthSetup.AdminPolicy)]
         [HttpPost]
         public async Task<ActionResult<Product>> CreateProduct(CreateProductDto dto)
         {
+            var grid = GridOf(dto.Variants, dto.Quantity, dto.MinStock);
+            var errors = VariantRules.Validate(grid);
+            if (grid.Any(v => v.Id is not null)) errors["variants"] = "Produto novo nao tem variacoes existentes.";
+            if (errors.Count > 0) return VariantErrors(errors);
+
+            var now = DateTime.UtcNow;
             var product = new Product
             {
                 Name = dto.Name,
                 Description = dto.Description,
                 Category = dto.Category,
-                Quantity = dto.Quantity,
+                Brand = Clean(dto.Brand),
                 Price = dto.Price,
                 Cost = dto.Cost,
-                MinStock = dto.MinStock,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                CreatedAt = now,
+                UpdatedAt = now
             };
+            for (var i = 0; i < grid.Count; i++)
+            {
+                var g = grid[i];
+                product.Variants.Add(new ProductVariant
+                {
+                    Size = VariantRules.NormSize(g.Size),
+                    Material = VariantRules.NormMaterial(g.Material),
+                    Quantity = g.Quantity,
+                    MinStock = g.MinStock,
+                    SortOrder = i
+                });
+            }
+            product.RecomputeTotals();
 
             _context.Products.Add(product);
-            // saldo inicial entra no historico, para o saldo sempre bater com a soma das movimentacoes
-            if (product.Quantity > 0)
-                _context.StockMovements.Add(StockService.NewMovement(product, MovementTypes.In, product.Quantity,
-                    "Estoque inicial", product.CreatedAt, Actor));
+            // saldo inicial de cada variacao entra no historico: o saldo sempre bate com a soma das movimentacoes
+            foreach (var v in product.Variants.Where(v => v.Quantity > 0))
+                _context.StockMovements.Add(StockService.NewMovement(product, v, MovementTypes.In, v.Quantity,
+                    "Estoque inicial", now, Actor));
             await _context.SaveChangesAsync();
             await _audit.LogAsync("produto_criado", "ok", Actor, null, Label(product));
 
@@ -142,42 +202,117 @@ namespace backend.Controllers
         // PUT: api/products/5
         [Authorize(Policy = AuthSetup.AdminPolicy)]
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateProduct(int id, UpdateProductDto dto)
+        public async Task<IActionResult> UpdateProduct(int id, UpdateProductDto dto, CancellationToken ct)
         {
-            var product = await _context.Products.FindAsync(id);
+            await using var tx = await _context.Database.BeginTransactionAsync(ct);
+            var (product, variants) = await _stock.LockProductAsync(id, ct);
 
             if (product == null)
             {
                 return Problem(statusCode: StatusCodes.Status404NotFound, title: "Product not found", detail: $"Product with ID {id} not found.");
             }
 
-            var delta = dto.Quantity - product.Quantity;
+            List<VariantInputDto> grid;
+            if (dto.Variants is not null) grid = dto.Variants;
+            else if (variants.Count == 1)
+            {
+                // compatibilidade: sem grade, Quantity/MinStock valem para a variacao unica
+                var only = variants[0];
+                grid = new() { new VariantInputDto { Id = only.Id, Size = only.Size, Material = only.Material, Quantity = dto.Quantity, MinStock = dto.MinStock } };
+            }
+            else grid = variants.Select(v => new VariantInputDto { Id = v.Id, Size = v.Size, Material = v.Material, Quantity = v.Quantity, MinStock = v.MinStock }).ToList();
+
+            var errors = VariantRules.Validate(grid);
+            if (grid.Any(g => g.Id is int gid && variants.All(v => v.Id != gid)))
+                errors["variants"] = "Variacao nao pertence a este produto.";
+            if (errors.Count > 0) return VariantErrors(errors);
+
+            // saldo que a tela mostrava x saldo atual (linhas travadas): nunca sobrescreve venda feita no meio tempo
+            var conflicts = new List<StockConflict>();
+            foreach (var g in grid)
+            {
+                if (g.Id is not int gid || g.ExpectedQuantity is not int expected) continue;
+                var current = variants.First(v => v.Id == gid);
+                if (g.Quantity == expected) g.Quantity = current.Quantity;        // não mexida: mantém o saldo atual
+                else if (current.Quantity != expected)
+                    conflicts.Add(new StockConflict(gid, current.Label, expected, current.Quantity));
+            }
+            if (conflicts.Count > 0)
+            {
+                var pd = ProblemDetailsFactory.CreateProblemDetails(HttpContext, StatusCodes.Status409Conflict,
+                    "Estoque mudou", conflicts.Count == 1
+                        ? $"O saldo de {conflicts[0].VariantLabel} mudou de {conflicts[0].Expected} para {conflicts[0].Current} enquanto a tela estava aberta."
+                        : $"{conflicts.Count} tamanhos mudaram de saldo enquanto a tela estava aberta.");
+                pd.Extensions["code"] = "stock_changed";
+                pd.Extensions["conflicts"] = conflicts;
+                return new ConflictObjectResult(pd) { ContentTypes = { "application/problem+json" } };
+            }
+            if (grid.Sum(g => (long)g.Quantity) > Limits.MaxValue)
+                return VariantErrors(new Dictionary<string, string> { ["variants"] = $"O estoque total do produto nao pode passar de {Limits.MaxValue}." });
+
+            var now = DateTime.UtcNow;
             product.Name = dto.Name;
             product.Description = dto.Description;
             product.Category = dto.Category;
-            product.Quantity = dto.Quantity;
+            product.Brand = Clean(dto.Brand);
             product.Price = dto.Price;
             product.Cost = dto.Cost;
-            product.MinStock = dto.MinStock;
-            product.UpdatedAt = DateTime.UtcNow;
+            product.UpdatedAt = now;
 
-            // mudanca de saldo pela edicao fica registrada como ajuste (o caminho normal e /movements)
-            if (delta != 0)
-                _context.StockMovements.Add(StockService.NewMovement(product, MovementTypes.Adjust, delta,
-                    "Edicao do produto", product.UpdatedAt, Actor));
-            await _context.SaveChangesAsync();
+            // removidas: o saldo que tinham sai como ajuste e o historico guarda o nome da variacao
+            var keep = grid.Where(g => g.Id is not null).Select(g => g.Id!.Value).ToHashSet();
+            foreach (var gone in variants.Where(v => !keep.Contains(v.Id)))
+            {
+                if (gone.Quantity != 0)
+                {
+                    var removed = -gone.Quantity;
+                    gone.Quantity = 0;
+                    _context.StockMovements.Add(StockService.NewMovement(product, gone, MovementTypes.Adjust, removed,
+                        "Variacao removida", now, Actor));
+                }
+                product.Variants.Remove(gone);
+                _context.ProductVariants.Remove(gone);
+            }
+
+            for (var i = 0; i < grid.Count; i++)
+            {
+                var g = grid[i];
+                var v = g.Id is int gid ? variants.First(x => x.Id == gid) : null;
+                var isNew = v is null;
+                if (v is null)
+                {
+                    v = new ProductVariant { ProductId = product.Id };
+                    product.Variants.Add(v);
+                }
+                v.Size = VariantRules.NormSize(g.Size);
+                v.Material = VariantRules.NormMaterial(g.Material);
+                v.MinStock = g.MinStock;
+                v.SortOrder = i;
+                var delta = g.Quantity - v.Quantity;
+                v.Quantity = g.Quantity;
+                // mudanca de saldo pela edicao fica registrada (o caminho normal e /movements); variacao nova entra como estoque inicial
+                if (delta != 0)
+                    _context.StockMovements.Add(StockService.NewMovement(product, v,
+                        isNew ? MovementTypes.In : MovementTypes.Adjust, delta,
+                        isNew ? "Estoque inicial" : "Edicao do produto", now, Actor));
+            }
+            product.RecomputeTotals();
+
+            await _context.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
             await _audit.LogAsync("produto_editado", "ok", Actor, null, Label(product));
 
+            product.Variants = product.Variants.OrderBy(v => v.SortOrder).ThenBy(v => v.Id).ToList();
             return Ok(product);
         }
 
-        // PATCH: api/products/5/quantity  {"delta": -1}
-        // Ajuste rapido (botoes +/-): registrado como movimentacao do tipo Ajuste. Atomico (linha travada na transacao).
-        [Authorize(Policy = AuthSetup.StockPolicy)]
+        // PATCH: api/products/5/quantity  {"delta": -1, "variantId": 12}
+        // Ajuste rapido (botoes +/-): registrado como movimentacao do tipo Ajuste. Atomico (linhas travadas na transacao).
+        [Authorize(Policy = AuthSetup.AdminPolicy)]
         [HttpPatch("{id}/quantity")]
         public async Task<ActionResult<Product>> AdjustQuantity(int id, AdjustQuantityDto dto, CancellationToken ct)
         {
-            var result = await _stock.ApplyDeltaAsync(id, MovementTypes.Adjust, dto.Delta, "Ajuste rapido",
+            var result = await _stock.ApplyDeltaAsync(id, dto.VariantId, MovementTypes.Adjust, dto.Delta, "Ajuste rapido",
                 DateTime.UtcNow, Actor, ct);
 
             return result.Outcome switch
@@ -186,7 +321,9 @@ namespace backend.Controllers
                     detail: $"Product with ID {id} not found."),
                 StockOutcome.OutOfRange => Problem(statusCode: StatusCodes.Status409Conflict, title: "Invalid stock quantity",
                     detail: $"Quantity must stay between 0 and {Limits.MaxValue}."),
-                _ => Ok(result.Product)
+                StockOutcome.VariantRequired or StockOutcome.VariantNotFound => VariantErrors(new Dictionary<string, string>
+                    { ["variantId"] = result.Outcome == StockOutcome.VariantRequired ? "Escolha o tamanho/material." : "Variacao nao pertence a este produto." }),
+                _ => Ok(await WithVariants().AsNoTracking().FirstAsync(p => p.Id == id, ct))
             };
         }
 

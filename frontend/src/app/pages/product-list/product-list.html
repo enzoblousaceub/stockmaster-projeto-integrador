@@ -1,220 +1,103 @@
 <div class="page">
   <header class="page-header">
-    <div>
-      <h1>Produtos</h1>
-      <p class="subtitle">Gerencie os itens do seu estoque</p>
+    <div class="grow">
+      @if (arrival()) {
+        <h1>Chegou mercadoria</h1>
+        <p class="subtitle">Toque no produto que chegou para somar as peças ao estoque.</p>
+      } @else {
+        <h1>Produtos</h1>
+        <p class="subtitle">Toque num produto para ver os tamanhos e quanto tem de cada.</p>
+      }
     </div>
-    @if (canWrite()) {
-    <a class="btn btn-primary btn-new" routerLink="/products/new" id="btn-new-product">
-      <mat-icon aria-hidden="true">add</mat-icon>
-      <span>Novo produto</span>
-    </a>
+    @if (canWrite() && !arrival()) {
+      <div class="head-acts">
+        <a class="btn btn-primary" routerLink="/products/new" id="btn-new-product">
+          <mat-icon aria-hidden="true">add</mat-icon><span>Cadastrar produto</span>
+        </a>
+      </div>
     }
   </header>
 
-  <div class="sr-only" role="status" aria-live="polite">{{ announcement() }}</div>
+  @if (arrival()) {
+    <div class="arrival-note">
+      <span>Produto novo, que ainda não está na lista?</span>
+      <a class="btn btn-outline" routerLink="/products/new">Cadastrar produto</a>
+      <button type="button" class="btn btn-ghost" (click)="leaveArrival()">Cancelar</button>
+    </div>
+  }
 
-  <!-- Filtros -->
-  <form class="filters" role="search" aria-label="Filtrar produtos" (submit)="$event.preventDefault(); submitSearch(s.value)">
-    <div class="field field-search">
-      <label for="product-search">Buscar</label>
-      <div class="input-wrap">
-        <mat-icon aria-hidden="true">search</mat-icon>
-        <input #s id="product-search" type="search" maxlength="100" placeholder="Nome ou descrição"
-          autocomplete="off" enterkeyhint="search" [value]="query()" (search)="submitSearch(s.value)">
-      </div>
+  <div class="search">
+    <mat-icon aria-hidden="true">search</mat-icon>
+    <label for="product-search" class="sr-only">Procurar produto</label>
+    <input id="product-search" class="input" type="search" placeholder="Procurar por nome ou marca" autocomplete="off"
+      enterkeyhint="search" [value]="search()" (input)="onSearch($any($event.target).value)">
+  </div>
+
+  @if (categories().length > 1) {
+    <div class="pills cats" role="group" aria-label="Filtrar por tipo de peça">
+      <button type="button" class="pill" [attr.aria-pressed]="category() === ''" (click)="category.set('')">Todos</button>
+      @for (c of categories(); track c) {
+        <button type="button" class="pill" [attr.aria-pressed]="category() === c" (click)="category.set(c)">{{ c }}</button>
+      }
     </div>
-    <div class="field">
-      <label for="product-category">Categoria</label>
-      <select id="product-category" [value]="category()" (change)="setCategory(c.value)" #c>
-        <option value="">Todas</option>
-        @for (cat of categories(); track cat) { <option [value]="cat" [selected]="cat === category()">{{ cat }}</option> }
-      </select>
-    </div>
-    <div class="field field-sort">
-      <label for="product-sort">Ordenar por</label>
-      <select id="product-sort" (change)="setSort(o.value)" #o>
-        @for (opt of sortOptions; track opt.value) { <option [value]="opt.value" [selected]="opt.value === sortValue()">{{ opt.label }}</option> }
-      </select>
-    </div>
-    @if (hasFilters()) {
-      <button type="button" class="btn btn-outline btn-clear" (click)="clearFilters()">
-        <mat-icon aria-hidden="true">filter_alt_off</mat-icon><span>Limpar filtros</span>
-      </button>
-    }
-  </form>
+  }
 
   @switch (state()) {
     @case ('loading') {
-      <div class="panel" aria-hidden="true">
-        @for (i of [1, 2, 3, 4, 5]; track i) { <span class="sk"></span> }
-      </div>
+      <div class="results" aria-busy="true">@for (i of [1, 2, 3, 4, 5]; track i) { <span class="sk"></span> }</div>
     }
-
     @case ('error') {
-      <div class="state-box" role="alert">
-        <mat-icon aria-hidden="true">cloud_off</mat-icon>
-        <h2>Não foi possível carregar os produtos</h2>
-        <p>Verifique sua conexão e tente novamente.</p>
-        <button type="button" class="btn btn-primary" (click)="load()" id="btn-retry">
-          <mat-icon aria-hidden="true">refresh</mat-icon><span>Tentar novamente</span>
-        </button>
+      <div class="state-box results" role="alert">
+        <mat-icon aria-hidden="true">wifi_off</mat-icon>
+        <h2>Não deu para carregar os produtos</h2>
+        <p>Verifique a internet e tente de novo.</p>
+        <button type="button" class="btn btn-primary" (click)="load()">Tentar de novo</button>
       </div>
     }
-
-    @case ('ready') {
+    @default {
       @if (products().length === 0) {
-        @if (hasFilters()) {
-          <div class="state-box">
-            <mat-icon aria-hidden="true">search_off</mat-icon>
-            <h2>Nenhum resultado</h2>
-            <p>Nenhum produto corresponde aos filtros atuais.</p>
-            <button type="button" class="btn btn-outline" (click)="clearFilters()">Limpar filtros</button>
-          </div>
-        } @else {
-          <div class="state-box">
-            <mat-icon aria-hidden="true">inventory_2</mat-icon>
-            <h2>Nenhum produto cadastrado</h2>
-            <p>Cadastre o primeiro item para começar a controlar o estoque.</p>
-            @if (canWrite()) {
-              <a class="btn btn-primary" routerLink="/products/new">
-              <mat-icon aria-hidden="true">add</mat-icon><span>Cadastrar produto</span>
-            </a>
-            }
-          </div>
-        }
-      } @else {
-        <!-- Tabela (tablet/desktop) -->
-        <div class="panel table-panel">
-          <table class="tbl" [class.readonly]="!canMove()">
-            <caption class="sr-only">Lista de produtos</caption>
-            <colgroup>
-              <col class="c-name"><col class="c-cat"><col class="c-qty"><col class="c-price"><col class="c-status"><col class="c-actions">
-            </colgroup>
-            <thead>
-              <tr>
-                <th scope="col" [attr.aria-sort]="ariaSort('name')">
-                  <button type="button" class="th-btn" (click)="sortBy('name')">Produto
-                    <mat-icon aria-hidden="true">{{ sortKey() === 'name' ? (sortDir() === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'unfold_more' }}</mat-icon></button>
-                </th>
-                <th scope="col" [attr.aria-sort]="ariaSort('category')">
-                  <button type="button" class="th-btn" (click)="sortBy('category')">Categoria
-                    <mat-icon aria-hidden="true">{{ sortKey() === 'category' ? (sortDir() === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'unfold_more' }}</mat-icon></button>
-                </th>
-                <th scope="col" class="num-col" [attr.aria-sort]="ariaSort('quantity')">
-                  <button type="button" class="th-btn" (click)="sortBy('quantity')">Qtd.
-                    <mat-icon aria-hidden="true">{{ sortKey() === 'quantity' ? (sortDir() === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'unfold_more' }}</mat-icon></button>
-                </th>
-                <th scope="col" class="num-col" [attr.aria-sort]="ariaSort('price')">
-                  <button type="button" class="th-btn" (click)="sortBy('price')">Preço
-                    <mat-icon aria-hidden="true">{{ sortKey() === 'price' ? (sortDir() === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'unfold_more' }}</mat-icon></button>
-                </th>
-                <th scope="col" [attr.aria-sort]="ariaSort('status')">
-                  <button type="button" class="th-btn" (click)="sortBy('status')">Status
-                    <mat-icon aria-hidden="true">{{ sortKey() === 'status' ? (sortDir() === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'unfold_more' }}</mat-icon></button>
-                </th>
-                <th scope="col" class="actions-col"><span class="sr-only">Ações</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (p of pageItems(); track p.id) {
-                <tr>
-                  <td>
-                    <div class="cell-product">
-                      @if (image(p); as src) { <img class="thumb" [src]="src" alt="" width="36" height="36" loading="lazy"> }
-                      <div class="cell-text">
-                        <a class="p-name p-link" [routerLink]="['/products', p.id]" [title]="p.name">{{ p.name }}</a>
-                        <span class="p-code num">{{ code(p) }}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td><span class="cat" [title]="p.category">{{ p.category }}</span></td>
-                  <td class="num-col num">{{ p.quantity | number }}</td>
-                  <td class="num-col num">{{ p.price | currency: 'BRL' : 'symbol' : '1.2-2' }}</td>
-                  <td><span class="chip" [class]="'chip chip--' + status(p)">{{ statusLabel(p) }}</span></td>
-                  <td class="actions-col">
-                    @if (canMove()) {
-                    <button type="button" class="icon-act" #mv (click)="openMovement(p, mv)"
-                      [attr.aria-label]="'Movimentar estoque de ' + p.name" title="Entrada / saída">
-                      <mat-icon aria-hidden="true">swap_vert</mat-icon>
-                    </button>
-                    }
-                    @if (canWrite()) {
-                    <a class="icon-act" [routerLink]="['/products', p.id, 'edit']" [attr.aria-label]="'Editar ' + p.name" title="Editar">
-                      <mat-icon aria-hidden="true">edit</mat-icon>
-                    </a>
-                    <button type="button" class="icon-act icon-act--danger" #del (click)="confirmDelete(p, del)"
-                      [attr.aria-label]="'Excluir ' + p.name" title="Excluir">
-                      <mat-icon aria-hidden="true">delete</mat-icon>
-                    </button>
-                  }
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
+        <div class="state-box results">
+          <mat-icon aria-hidden="true">checkroom</mat-icon>
+          <h2>Nenhum produto cadastrado</h2>
+          <p>Cadastre a primeira peça com foto e tamanhos.</p>
+          @if (canWrite()) { <a class="btn btn-primary" routerLink="/products/new">Cadastrar produto</a> }
         </div>
-
-        <!-- Cards (mobile) -->
-        <ul class="cards">
-          @for (p of pageItems(); track p.id) {
-            <li class="card">
-              <div class="card-top">
-                <div class="card-id">
-                  <a class="p-name p-link" [routerLink]="['/products', p.id]">{{ p.name }}</a>
-                  <span class="card-meta"><span class="cat">{{ p.category }}</span> · <span class="num">{{ code(p) }}</span></span>
-                </div>
-                <span [class]="'chip chip--' + status(p)">{{ statusLabel(p) }}</span>
-              </div>
-              <div class="card-mid">
-                <span class="price num">{{ p.price | currency: 'BRL' : 'symbol' : '1.2-2' }}</span>
-                <span class="min">mínimo <span class="num">{{ p.minStock }}</span></span>
-              </div>
-              @if (canMove()) {
-              <div class="card-bottom">
-                <div class="stepper" role="group" [attr.aria-label]="'Quantidade de ' + p.name">
-                  <button type="button" (click)="adjust(p, -1)" [attr.aria-disabled]="p.quantity <= 0"
-                    [attr.aria-label]="'Diminuir quantidade de ' + p.name">
-                    <mat-icon aria-hidden="true">remove</mat-icon>
-                  </button>
-                  <span class="qty num">{{ p.quantity | number }}</span>
-                  <button type="button" (click)="adjust(p, 1)" [attr.aria-disabled]="p.quantity >= 1000000"
-                    [attr.aria-label]="'Aumentar quantidade de ' + p.name">
-                    <mat-icon aria-hidden="true">add</mat-icon>
-                  </button>
-                </div>
-                <div class="card-acts">
-                  <button type="button" class="icon-act" #mvm (click)="openMovement(p, mvm)" [attr.aria-label]="'Movimentar estoque de ' + p.name">
-                    <mat-icon aria-hidden="true">swap_vert</mat-icon>
-                  </button>
-                  @if (canWrite()) {
-                  <a class="icon-act" [routerLink]="['/products', p.id, 'edit']" [attr.aria-label]="'Editar ' + p.name">
-                    <mat-icon aria-hidden="true">edit</mat-icon>
-                  </a>
-                  <button type="button" class="icon-act icon-act--danger" #delm (click)="confirmDelete(p, delm)"
-                    [attr.aria-label]="'Excluir ' + p.name">
-                    <mat-icon aria-hidden="true">delete</mat-icon>
-                  </button>
+      } @else if (visible().length === 0) {
+        <div class="state-box results">
+          <mat-icon aria-hidden="true">search_off</mat-icon>
+          <h2>Nada encontrado</h2>
+          <p>Confira o nome ou escolha "Todos".</p>
+        </div>
+      } @else {
+        <p class="count muted" aria-live="polite">{{ visible().length }} {{ visible().length === 1 ? 'produto' : 'produtos' }}</p>
+        <ul class="list">
+          @for (p of visible(); track p.id) {
+            <li>
+              <a class="list-row" [routerLink]="['/products', p.id]" [queryParams]="arrival() ? { entrada: 1 } : null" [id]="'product-' + p.id">
+                @if (imageOf(p); as src) { <img class="thumb" [src]="src" alt="" loading="lazy"> }
+                @else { <span class="thumb"><app-garment [of]="p.category + ' ' + p.name" /></span> }
+                <div class="grow">
+                  <div class="title">{{ p.name }}</div>
+                  <div class="sub">{{ p.brand ? p.brand + ', ' : '' }}{{ gridText(p) }}</div>
+                  @if (alert(p); as a) {
+                    @if (a.out || a.low) {
+                      <div class="flags">
+                        @if (a.out) { <span class="chip chip--out">{{ a.out }} {{ a.out === 1 ? 'tamanho esgotado' : 'tamanhos esgotados' }}</span> }
+                        @if (a.low) { <span class="chip chip--low">{{ a.low }} no mínimo</span> }
+                      </div>
+                    }
                   }
                 </div>
-              </div>
-            } @else {
-              <div class="card-ro"><span>Quantidade</span> <b class="num">{{ p.quantity | number }}</b></div>
-            }
+                <span class="end">
+                  <span class="qty num">{{ p.quantity }}</span>
+                  <span class="qty-label">{{ p.quantity === 1 ? 'peça' : 'peças' }}</span>
+                </span>
+                @if (arrival()) { <mat-icon class="go" aria-hidden="true">add_circle</mat-icon> }
+              </a>
             </li>
           }
         </ul>
-
-        <mat-paginator class="pager" [length]="sorted().length" [pageIndex]="pageIndex()" [pageSize]="pageSize()"
-          [pageSizeOptions]="[10, 25, 50]" [showFirstLastButtons]="true" (page)="onPage($event)" aria-label="Paginação de produtos">
-        </mat-paginator>
       }
     }
-  }
-
-  @if (canWrite()) {
-    <a class="fab" routerLink="/products/new" aria-label="Novo produto" id="fab-new-product">
-    <mat-icon aria-hidden="true">add</mat-icon>
-  </a>
   }
 </div>

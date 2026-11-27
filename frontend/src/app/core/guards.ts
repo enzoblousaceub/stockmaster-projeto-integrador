@@ -36,3 +36,22 @@ export const guestGuard: CanActivateFn = async () => {
   if (!auth.ready()) return false;
   return auth.isLoggedIn() ? router.createUrlTree(['/']) : true;
 };
+
+/** Exige um perfil; quem não tem vai para a sua tela inicial (o backend também exige). */
+function roleGuard(allowed: (auth: AuthService) => boolean): CanActivateFn {
+  return async () => {
+    const auth = inject(AuthService);
+    const router = inject(Router);
+    await auth.ensureLoaded();
+    if (!auth.ready()) return false;
+    if (!auth.isLoggedIn()) return router.createUrlTree(['/login']);
+    return allowed(auth) ? true : router.createUrlTree([auth.homePath()]);
+  };
+}
+
+/** Vender: Admin ou Operador. */
+export const salesGuard: CanActivateFn = roleGuard((a) => a.canSell());
+/** Relatórios: Admin ou Visualizador. */
+export const reportsGuard: CanActivateFn = roleGuard((a) => a.canReport());
+/** Painel inicial: o funcionário não tem painel, vai direto para a venda. */
+export const homeGuard: CanActivateFn = roleGuard((a) => !a.isOperator());

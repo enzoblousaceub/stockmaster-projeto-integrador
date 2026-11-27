@@ -1,173 +1,343 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { AbstractControl, ReactiveFormsModule, FormBuilder, FormGroup, ValidationErrors, Validators } from '@angular/forms';
-import { ActivatedRoute, Router, RouterModule } from '@angular/router';
-import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatSelectModule } from '@angular/material/select';
-import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { ProductService } from '../../services/product.service';
-import { Product, productImageUrl } from '../../models/product.model';
+import { Component, computed, inject, signal } from '@angular/core';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Observable, of, switchMap, map, catchError } from 'rxjs';
+import { MatIconModule } from '@angular/material/icon';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { ProductService } from '../../services/product.service';
+import { parseProblem } from '../../core/api-error';
+import { CreateProduct, Product, VariantInput, isSingle, productImageUrl } from '../../models/product.model';
 
-const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
-const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+interface Cell { id?: number; quantity: number; minStock: number; }
 
-/** Preço com no máximo 2 casas decimais. */
-function twoDecimals(c: AbstractControl): ValidationErrors | null {
-  const v = c.value;
-  if (v === null || v === '' || typeof v !== 'number') return null;
-  return Math.abs(v * 100 - Math.round(v * 100)) > 1e-6 ? { decimals: true } : null;
-}
+const MAX_UPLOAD = 2 * 1024 * 1024;
+const MAX_SIDE = 1600;
+const DEFAULT_CATEGORIES = ['Calças', 'Camisetas', 'Camisas', 'Bermudas', 'Vestidos', 'Saias', 'Jaquetas', 'Moletons', 'Acessórios'];
+const PRESETS: { label: string; sizes: string[] }[] = [
+  { label: 'P, M, G, GG', sizes: ['P', 'M', 'G', 'GG'] },
+  { label: 'PP ao GG', sizes: ['PP', 'P', 'M', 'G', 'GG'] },
+  { label: '36 ao 46', sizes: ['36', '38', '40', '42', '44', '46'] },
+  { label: '1, 2, 4, 6, 8 (infantil)', sizes: ['1', '2', '4', '6', '8'] }
+];
 
+/**
+ * Cadastro e edição. O dono tira a foto pelo celular, preenche o básico e monta a grade:
+ * tamanhos (e materiais, se houver) e quantas peças tem de cada combinação.
+ */
 @Component({
   selector: 'app-product-form',
   standalone: true,
-  imports: [
-    CommonModule, ReactiveFormsModule, RouterModule,
-    MatIconModule,
-    MatInputModule, MatFormFieldModule, MatSelectModule,
-    MatSnackBarModule
-  ],
+  imports: [RouterLink, MatIconModule],
   templateUrl: './product-form.html',
   styleUrl: './product-form.scss'
 })
-export class ProductFormComponent implements OnInit {
-  form!: FormGroup;
-  isEditMode = false;
-  productId: number | null = null;
-  loading = false;
-  categories: string[] = [];
-  pageTitle = 'Novo produto';
-  previewOpen = false;
-  /** imagem atual (servidor) ou escolhida (data URL) para a pré-visualização */
-  imagePreview: string | null = null;
-  imageError = '';
+export class ProductFormComponent {
+  private api = inject(ProductService);
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
+  private snack = inject(MatSnackBar);
+  readonly presets = PRESETS;
+
+  readonly productId = signal<number | null>(null);
+  readonly loading = signal(false);
+  readonly saving = signal(false);
+  readonly submitted = signal(false);
+  readonly categories = signal<string[]>(DEFAULT_CATEGORIES);
+
+  // dados
+  readonly name = signal('');
+  readonly brand = signal('');
+  readonly category = signal('');
+  /** preço e custo como o dono digita ("299,90"); o número sai na hora de validar/salvar */
+  readonly priceText = signal('');
+  readonly costText = signal('');
+  readonly price = computed(() => this.num(this.priceText()));
+  readonly cost = computed(() => this.num(this.costText()));
+  readonly description = signal('');
+
+  // grade
+  readonly hasGrid = signal(true);
+  readonly sizes = signal<string[]>([]);
+  readonly materials = signal<string[]>([]);
+  readonly cells = signal<Record<string, Cell>>({});
+  readonly single = signal<Cell>({ quantity: 0, minStock: 0 });
+  readonly newSize = signal('');
+  readonly newMaterial = signal('');
+  /** saldos de quando a tela abriu, para avisar quando tirar um tamanho que tem peças */
+  private original = new Map<string, number>();
+  /** saldo de cada variação existente como a tela mostrou (vai junto ao salvar) */
+  private shownById = new Map<number, number>();
+
+  // foto
+  readonly imagePreview = signal<string | null>(null);
+  readonly imageError = signal('');
+  readonly imageBusy = signal(false);
   private imageFile: File | null = null;
   private removeImage = false;
   private hadImage = false;
 
-  constructor(
-    private fb: FormBuilder,
-    private productService: ProductService,
-    private route: ActivatedRoute,
-    private router: Router,
-    private snackBar: MatSnackBar,
-    private cdr: ChangeDetectorRef
-  ) {}
+  readonly isEdit = computed(() => this.productId() !== null);
+  readonly mats = computed(() => (this.materials().length ? this.materials() : ['']));
+  readonly variants = computed<VariantInput[]>(() => {
+    if (!this.hasGrid()) {
+      const c = this.single();
+      return [{ id: c.id, size: 'Único', material: '', quantity: c.quantity, minStock: c.minStock }];
+    }
+    const out: VariantInput[] = [];
+    for (const m of this.mats())
+      for (const s of this.sizes()) {
+        const c = this.cells()[this.key(s, m)] ?? { quantity: 0, minStock: 1 };
+        out.push({ id: c.id, size: s, material: m, quantity: c.quantity, minStock: c.minStock });
+      }
+    return out;
+  });
+  readonly total = computed(() => this.variants().reduce((s, v) => s + v.quantity, 0));
+  /** peças que saem do estoque porque o tamanho/material foi tirado da grade */
+  readonly removedStock = computed(() => {
+    const keep = new Set(this.variants().map((v) => this.key(v.size, v.material)));
+    let n = 0;
+    this.original.forEach((qty, k) => { if (!keep.has(k)) n += qty; });
+    return n;
+  });
 
-  ngOnInit(): void {
-    this.form = this.fb.group({
-      name: ['', [Validators.required, Validators.maxLength(200)]],
-      description: ['', [Validators.maxLength(500)]],
-      category: ['', [Validators.required, Validators.maxLength(100)]],
-      quantity: [0, [Validators.required, Validators.min(0), Validators.max(1000000)]],
-      price: [0, [Validators.required, Validators.min(0), Validators.max(1000000), twoDecimals]],
-      cost: [0, [Validators.required, Validators.min(0), Validators.max(1000000), twoDecimals]],
-      minStock: [0, [Validators.required, Validators.min(0), Validators.max(1000000)]]
+  readonly errors = computed(() => {
+    const e: Record<string, string> = {};
+    if (!this.name().trim()) e['name'] = 'Escreva o nome da peça.';
+    if (!this.category().trim()) e['category'] = 'Escolha ou escreva o tipo de peça.';
+    const p = this.price();
+    if (p === null || isNaN(p) || p < 0) e['price'] = 'Informe o preço de venda.';
+    const c = this.cost();
+    if (c !== null && (isNaN(c) || c < 0)) e['cost'] = 'O custo não pode ser negativo.';
+    if (this.hasGrid() && this.sizes().length === 0) e['sizes'] = 'Adicione pelo menos um tamanho.';
+    return e;
+  });
+
+  constructor() {
+    this.api.getCategories().subscribe({
+      next: (list) => this.categories.set([...new Set([...list, ...DEFAULT_CATEGORIES])].sort((a, b) => a.localeCompare(b, 'pt-BR'))),
+      error: () => {}
     });
-
-    this.loadCategories();
-
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
-      this.isEditMode = true;
-      this.productId = +id;
-      this.pageTitle = 'Editar produto';
-      // na edição o saldo muda só por movimentação (entrada/saída/conferência), para manter o histórico
-      this.form.get('quantity')?.disable();
-      this.loadProduct(this.productId);
+      this.productId.set(+id);
+      this.load(+id);
     }
   }
 
-  loadProduct(id: number): void {
-    this.loading = true;
-    this.productService.getProduct(id).subscribe({
-      next: (product) => {
-        this.form.patchValue({
-          name: product.name,
-          description: product.description || '',
-          category: product.category,
-          quantity: product.quantity,
-          price: product.price,
-          cost: product.cost ?? 0,
-          minStock: product.minStock
-        });
-        this.hadImage = !!product.imageUpdatedAt;
-        this.imagePreview = productImageUrl(product);
-        this.loading = false;
-        this.cdr.markForCheck();
-      },
+  private key(size: string, material: string): string {
+    return `${size.toLowerCase()}|${material.toLowerCase()}`;
+  }
+
+  private load(id: number): void {
+    this.loading.set(true);
+    this.api.getProduct(id).subscribe({
+      next: (p) => { this.fill(p); this.loading.set(false); },
       error: () => {
-        this.snackBar.open('Produto não encontrado', 'Fechar', { duration: 3000 });
-        this.loading = false;
-        this.cdr.markForCheck();
+        this.snack.open('Produto não encontrado.', 'Fechar', { duration: 3000 });
         this.router.navigate(['/products']);
       }
     });
   }
 
-  loadCategories(): void {
-    this.productService.getCategories().subscribe({
-      next: (categories) => {
-        this.categories = categories;
-        this.cdr.markForCheck();
-      }
-    });
+  private fill(p: Product): void {
+    this.name.set(p.name);
+    this.brand.set(p.brand ?? '');
+    this.category.set(p.category);
+    this.priceText.set(this.money(p.price));
+    this.costText.set(p.cost ? this.money(p.cost) : '');
+    this.description.set(p.description ?? '');
+    this.hadImage = !!p.imageUpdatedAt;
+    this.imagePreview.set(productImageUrl(p));
+    this.original = new Map(p.variants.map((v) => [this.key(v.size, v.material), v.quantity]));
+    this.shownById = new Map(p.variants.map((v) => [v.id, v.quantity]));
+    if (isSingle(p)) {
+      const v = p.variants[0];
+      this.hasGrid.set(false);
+      this.single.set({ id: v.id, quantity: v.quantity, minStock: v.minStock });
+      return;
+    }
+    this.hasGrid.set(true);
+    this.sizes.set([...new Set(p.variants.map((v) => v.size))]);
+    this.materials.set([...new Set(p.variants.map((v) => v.material))].filter(Boolean));
+    this.cells.set(Object.fromEntries(p.variants.map((v) => [this.key(v.size, v.material), { id: v.id, quantity: v.quantity, minStock: v.minStock }])));
   }
 
-  // ---------- imagem (RF003) ----------
-  onImageSelected(input: HTMLInputElement): void {
+  private money(n: number): string {
+    return n.toFixed(2).replace('.', ',');
+  }
+
+  /** "1.299,90", "299,9" ou "299.90" viram número; vazio vira null; texto inválido vira NaN. */
+  num(value: string): number | null {
+    const t = value.trim().replace(/^R\$\s*/, '');
+    if (t === '') return null;
+    const normalized = t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t;
+    const n = Number(normalized);
+    return isNaN(n) ? NaN : Math.round(n * 100) / 100;
+  }
+
+  // ---------- grade ----------
+  applyPreset(sizes: string[]): void {
+    this.sizes.update((cur) => [...cur, ...sizes.filter((s) => !cur.some((c) => c.toLowerCase() === s.toLowerCase()))]);
+  }
+
+  addSize(): void {
+    const s = this.newSize().trim().toUpperCase().slice(0, 20);
+    if (!s) return;
+    if (!this.sizes().some((x) => x.toLowerCase() === s.toLowerCase())) this.sizes.update((cur) => [...cur, s]);
+    this.newSize.set('');
+  }
+
+  removeSize(s: string): void { this.sizes.update((cur) => cur.filter((x) => x !== s)); }
+
+  addMaterial(): void {
+    const raw = this.newMaterial().trim().slice(0, 40);
+    if (!raw) return;
+    const m = raw[0].toUpperCase() + raw.slice(1);
+    if (!this.materials().some((x) => x.toLowerCase() === m.toLowerCase())) {
+      // o primeiro material herda as quantidades que estavam "sem material"
+      if (this.materials().length === 0) {
+        this.cells.update((cells) => {
+          const next = { ...cells };
+          for (const s of this.sizes()) {
+            const from = next[this.key(s, '')];
+            if (from && !next[this.key(s, m)]) { next[this.key(s, m)] = from; delete next[this.key(s, '')]; }
+          }
+          return next;
+        });
+      }
+      this.materials.update((cur) => [...cur, m]);
+    }
+    this.newMaterial.set('');
+  }
+
+  removeMaterial(m: string): void { this.materials.update((cur) => cur.filter((x) => x !== m)); }
+
+  cell(size: string, material: string): Cell {
+    return this.cells()[this.key(size, material)] ?? { quantity: 0, minStock: 1 };
+  }
+
+  setCell(size: string, material: string, field: 'quantity' | 'minStock', value: number): void {
+    const n = Math.max(0, Math.min(1000000, Math.floor(Number(value) || 0)));
+    const k = this.key(size, material);
+    this.cells.update((cells) => ({ ...cells, [k]: { ...this.cell(size, material), [field]: n } }));
+  }
+
+  stepCell(size: string, material: string, d: number): void {
+    this.setCell(size, material, 'quantity', this.cell(size, material).quantity + d);
+  }
+
+  setSingle(field: 'quantity' | 'minStock', value: number): void {
+    const n = Math.max(0, Math.min(1000000, Math.floor(Number(value) || 0)));
+    this.single.update((c) => ({ ...c, [field]: n }));
+  }
+
+  // ---------- foto ----------
+  async onImage(input: HTMLInputElement): Promise<void> {
     const file = input.files?.[0];
-    input.value = ''; // permite escolher o mesmo arquivo de novo
+    input.value = ''; // permite escolher a mesma foto de novo
     if (!file) return;
-    if (!IMAGE_TYPES.includes(file.type)) { this.imageError = 'Use uma imagem JPEG, PNG ou WebP.'; return; }
-    if (file.size > MAX_IMAGE_BYTES) { this.imageError = 'A imagem deve ter no máximo 2 MB.'; return; }
-    this.imageError = '';
-    this.imageFile = file;
-    this.removeImage = false;
-    const reader = new FileReader();
-    reader.onload = () => { this.imagePreview = reader.result as string; this.cdr.markForCheck(); };
-    reader.readAsDataURL(file);
+    this.imageError.set('');
+    this.imageBusy.set(true);
+    try {
+      const jpeg = await this.shrink(file);
+      if (jpeg.size > MAX_UPLOAD) throw new Error('grande');
+      this.imageFile = jpeg;
+      this.removeImage = false;
+      this.imagePreview.set(URL.createObjectURL(jpeg));
+    } catch {
+      this.imageError.set('Não deu para usar essa foto. Tente tirar outra ou escolher uma imagem JPG ou PNG.');
+    } finally {
+      this.imageBusy.set(false);
+    }
+  }
+
+  /** Reduz a foto do celular (que costuma ter vários MB) para JPEG de até 1600px, abaixo do limite de 2 MB. */
+  private async shrink(file: File): Promise<File> {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    for (const q of [0.85, 0.75, 0.6]) {
+      const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/jpeg', q));
+      if (blob && blob.size <= MAX_UPLOAD) return new File([blob], 'foto.jpg', { type: 'image/jpeg' });
+    }
+    throw new Error('grande');
   }
 
   clearImage(): void {
     this.imageFile = null;
-    this.imagePreview = null;
-    this.imageError = '';
+    this.imagePreview.set(null);
+    this.imageError.set('');
     this.removeImage = this.hadImage;
   }
 
-  /** Envia/remove a imagem depois de salvar os dados. Falha na imagem não desfaz o cadastro: só avisa. */
   private syncImage(product: Product): Observable<boolean> {
-    if (this.imageFile) return this.productService.uploadImage(product.id, this.imageFile).pipe(map(() => true), catchError(() => of(false)));
-    if (this.removeImage) return this.productService.deleteImage(product.id).pipe(map(() => true), catchError(() => of(false)));
+    if (this.imageFile) return this.api.uploadImage(product.id, this.imageFile).pipe(map(() => true), catchError(() => of(false)));
+    if (this.removeImage) return this.api.deleteImage(product.id).pipe(map(() => true), catchError(() => of(false)));
     return of(true);
   }
 
-  onSubmit(): void {
-    if (this.form.invalid) {
-      this.form.markAllAsTouched();
+  /**
+   * Houve venda (ou entrada) enquanto a tela estava aberta e o dono tinha mexido nas quantidades.
+   * Traz os saldos atuais para a grade, mantém o resto do que foi digitado e pede para conferir.
+   */
+  private refreshStock(): void {
+    const id = this.productId();
+    if (!id) return;
+    this.api.getProduct(id).subscribe({
+      next: (p) => {
+        this.original = new Map(p.variants.map((v) => [this.key(v.size, v.material), v.quantity]));
+        this.shownById = new Map(p.variants.map((v) => [v.id, v.quantity]));
+        this.cells.update((cells) => {
+          const next = { ...cells };
+          for (const v of p.variants) {
+            const k = this.key(v.size, v.material);
+            if (next[k]?.id === v.id) next[k] = { ...next[k], quantity: v.quantity };
+          }
+          return next;
+        });
+        const only = p.variants.length === 1 ? p.variants[0] : null;
+        if (only && this.single().id === only.id) this.single.update((c) => ({ ...c, quantity: only.quantity }));
+        this.snack.open('Houve venda enquanto você editava. As quantidades foram atualizadas com o estoque de agora: confira e salve de novo.', 'Fechar', { duration: 9000 });
+      },
+      error: () => this.snack.open('O estoque mudou enquanto você editava. Abra o produto de novo para ver os números atuais.', 'Fechar', { duration: 7000 })
+    });
+  }
+
+  // ---------- salvar ----------
+  save(): void {
+    this.submitted.set(true);
+    if (Object.keys(this.errors()).length) {
+      this.snack.open('Confira os campos marcados em vermelho.', 'Fechar', { duration: 4000 });
       return;
     }
-
-    this.loading = true;
-    const { quantity, ...rest } = this.form.getRawValue();
-    const data = { ...rest, quantity: Number(quantity) || 0 };
-    const editing = this.isEditMode && this.productId;
-    const save$ = editing ? this.productService.updateProduct(this.productId!, data) : this.productService.createProduct(data);
-
-    save$.pipe(switchMap((product) => this.syncImage(product))).subscribe({
-      next: (imageOk) => {
-        const msg = editing ? 'Produto atualizado com sucesso' : 'Produto criado com sucesso';
-        this.snackBar.open(imageOk ? msg : `${msg}, mas a imagem não pôde ser salva`, 'Fechar', { duration: 4000 });
-        this.router.navigate(['/products']);
+    if (this.saving()) return;
+    this.saving.set(true);
+    const data: CreateProduct = {
+      name: this.name().trim(),
+      brand: this.brand().trim() || null,
+      category: this.category().trim(),
+      description: this.description().trim() || undefined,
+      price: this.price() ?? 0,
+      cost: this.cost() ?? 0,
+      variants: this.variants().map((v) => (v.id && this.shownById.has(v.id) ? { ...v, expectedQuantity: this.shownById.get(v.id) } : v))
+    };
+    const id = this.productId();
+    const save$ = id ? this.api.updateProduct(id, data) : this.api.createProduct(data);
+    save$.pipe(switchMap((p) => this.syncImage(p).pipe(map((ok) => ({ p, ok }))))).subscribe({
+      next: ({ p, ok }) => {
+        const msg = id ? 'Alterações salvas' : 'Produto cadastrado';
+        this.snack.open(ok ? `${msg}.` : `${msg}, mas a foto não foi enviada. Tente pôr a foto de novo.`, 'Fechar', { duration: 4500 });
+        this.router.navigate(['/products', p.id]);
       },
-      error: () => {
-        this.snackBar.open(editing ? 'Falha ao atualizar produto' : 'Falha ao criar produto', 'Fechar', { duration: 3000 });
-        this.loading = false;
-        this.cdr.markForCheck();
+      error: (err) => {
+        this.saving.set(false);
+        const p = parseProblem(err);
+        if (p.code === 'stock_changed') return this.refreshStock();
+        const detail = p.errors ? Object.values(p.errors).flat()[0] : null;
+        this.snack.open(detail ? `Não foi salvo: ${detail}` : 'Não foi salvo. Verifique a internet e tente de novo.', 'Fechar', { duration: 6000 });
       }
     });
   }

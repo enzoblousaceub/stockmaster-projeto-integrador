@@ -1,118 +1,189 @@
-<div class="page" [attr.aria-busy]="state() === 'loading'">
-  <header class="page-header">
-    <a class="back-btn" routerLink="/products" aria-label="Voltar para a lista de produtos">
-      <mat-icon aria-hidden="true">arrow_back</mat-icon>
-    </a>
-    <div class="grow">
-      <h1>{{ product()?.name ?? 'Produto' }}</h1>
-      @if (product(); as p) { <p class="subtitle"><span class="num">{{ code() }}</span> · {{ p.category }}</p> }
-    </div>
-    @if (state() === 'ready') {
-      <div class="head-acts">
-        @if (canMove()) {
-          <button type="button" class="btn btn-primary" (click)="openMovement()" id="btn-detail-move">
-            <mat-icon aria-hidden="true">swap_vert</mat-icon><span>Movimentar</span>
-          </button>
-        }
-        @if (canWrite()) {
-          <a class="btn btn-outline" [routerLink]="['/products', product()!.id, 'edit']" id="btn-detail-edit">
-            <mat-icon aria-hidden="true">edit</mat-icon><span>Editar</span>
-          </a>
-        }
-      </div>
-    }
-  </header>
-
+<div class="page">
   @switch (state()) {
-    @case ('loading') { <div aria-hidden="true">@for (i of [1, 2, 3, 4]; track i) { <span class="sk"></span> }</div> }
+    @case ('loading') {
+      <div aria-busy="true"><span class="sk"></span><span class="sk big"></span><span class="sk"></span></div>
+    }
     @case ('notfound') {
       <div class="state-box" role="alert">
         <mat-icon aria-hidden="true">search_off</mat-icon>
         <h2>Produto não encontrado</h2>
         <p>Ele pode ter sido excluído.</p>
-        <a class="btn btn-outline" routerLink="/products">Ver produtos</a>
+        <a class="btn btn-primary" routerLink="/products">Ver produtos</a>
       </div>
     }
     @case ('error') {
       <div class="state-box" role="alert">
-        <mat-icon aria-hidden="true">cloud_off</mat-icon>
-        <h2>Não foi possível carregar o produto</h2>
-        <p>Verifique sua conexão e tente novamente.</p>
-        <button type="button" class="btn btn-primary" (click)="load()">Tentar novamente</button>
+        <mat-icon aria-hidden="true">wifi_off</mat-icon>
+        <h2>Não deu para abrir o produto</h2>
+        <p>Verifique a internet e tente de novo.</p>
+        <button type="button" class="btn btn-primary" (click)="load()">Tentar de novo</button>
       </div>
     }
-    @case ('ready') {
+    @default {
       @if (product(); as p) {
+        <header class="page-header">
+          <a class="back-btn" routerLink="/products" aria-label="Voltar para produtos"><mat-icon>arrow_back</mat-icon></a>
+          <div class="grow">
+            <h1>{{ p.name }}</h1>
+            <p class="subtitle">{{ p.brand ? p.brand + ', ' : '' }}{{ p.category }}</p>
+          </div>
+        </header>
+
         <div class="top">
-          <div class="panel media">
-            @if (image(); as src) { <img [src]="src" [alt]="'Foto de ' + p.name" width="220" height="220"> }
-            @else { <div class="no-img" aria-hidden="true"><mat-icon>image</mat-icon></div> }
-          </div>
-          <div class="panel facts">
-            <dl>
-              <div><dt>Saldo</dt><dd><b class="num big">{{ p.quantity | number }}</b> <span [class]="'chip chip--' + status()">{{ statusLabel() }}</span></dd></div>
-              <div><dt>Estoque mínimo</dt><dd class="num">{{ p.minStock | number }}</dd></div>
-              <div><dt>Preço de venda</dt><dd class="num">{{ p.price | currency: 'BRL' : 'symbol' : '1.2-2' }}</dd></div>
-              <div><dt>Custo</dt><dd class="num">{{ p.cost | currency: 'BRL' : 'symbol' : '1.2-2' }}</dd></div>
-              <div><dt>Margem</dt><dd class="num">{{ margin() === null ? '—' : (margin()! | percent) }}</dd></div>
-              <div><dt>Valor em estoque (custo)</dt><dd class="num">{{ p.quantity * p.cost | currency: 'BRL' : 'symbol' : '1.2-2' }}</dd></div>
-            </dl>
-            @if (p.description) { <p class="desc">{{ p.description }}</p> }
-          </div>
-          <div class="panel forecast" aria-labelledby="fc-title">
-            <h2 id="fc-title"><mat-icon aria-hidden="true">insights</mat-icon>Previsão</h2>
-            @if (forecast(); as f) {
-              @if (f.avgDailyOut > 0) {
-                <p class="fc-main">
-                  @if (f.daysToStockout !== null && f.daysToStockout < 1) { Acaba <b>hoje</b> no ritmo atual. }
-                  @else { Acaba em <b class="num">~{{ f.daysToStockout | number: '1.0-0' }} dias</b> ({{ f.stockoutDate | date: 'dd/MM' }}). }
-                </p>
-                <p class="muted small">Consumo médio: <span class="num">{{ f.avgDailyOut | number: '1.0-2' }}</span>/dia (últimos 30 dias)</p>
-              } @else {
-                <p class="fc-main">Sem saídas nos últimos 30 dias.</p>
-              }
-              @if (f.needsReorder) {
-                <p class="reorder"><mat-icon aria-hidden="true">shopping_cart</mat-icon>
-                  Sugestão: comprar <b class="num">{{ f.suggestedReorder | number }}</b> unidades</p>
-              } @else {
-                <p class="muted small">Nenhuma reposição necessária agora.</p>
-              }
-            } @else {
-              <p class="muted">Previsão indisponível no momento.</p>
+          <figure class="photo">
+            @if (image(); as src) { <img [src]="src" [alt]="'Foto de ' + p.name"> }
+            @else {
+              <span class="photo-empty"><app-garment [of]="p.category + ' ' + p.name" /></span>
+              @if (auth.canWrite()) { <figcaption><a routerLink="edit" class="btn btn-ghost"><mat-icon>add_a_photo</mat-icon>Pôr foto</a></figcaption> }
             }
+          </figure>
+
+          <div class="facts">
+            <p class="price"><span class="num">{{ p.price | currency: 'BRL' : 'symbol' : '1.2-2' : 'pt-BR' }}</span></p>
+            @if (auth.isAdmin()) {
+              <p class="muted cost">Custo {{ p.cost | currency: 'BRL' : 'symbol' : '1.2-2' : 'pt-BR' }}{{ margin() !== null ? ', margem de ' + margin() + '%' : '' }}</p>
+            }
+            <p class="total"><b class="num">{{ p.quantity }}</b> {{ p.quantity === 1 ? 'peça na loja' : 'peças na loja' }}</p>
+            @if (p.description) { <p class="desc">{{ p.description }}</p> }
+
+            <div class="acts">
+              @if (auth.canMove()) {
+                <button type="button" class="btn btn-primary btn-block" (click)="openEntry()" id="btn-arrival">
+                  <mat-icon aria-hidden="true">local_shipping</mat-icon><span>Chegou mercadoria</span>
+                </button>
+              }
+              @if (auth.isOperator()) {
+                <a class="btn btn-primary btn-block" routerLink="/vender"><mat-icon aria-hidden="true">shopping_bag</mat-icon><span>Ir para a venda</span></a>
+              }
+              @if (auth.canWrite()) {
+                <div class="acts-row">
+                  <a class="btn btn-outline" routerLink="edit" id="btn-edit"><mat-icon aria-hidden="true">edit</mat-icon><span>Editar</span></a>
+                  <button type="button" class="btn btn-outline danger" (click)="confirmDelete()" id="btn-delete">
+                    <mat-icon aria-hidden="true">delete</mat-icon><span>Excluir</span>
+                  </button>
+                </div>
+              }
+            </div>
           </div>
         </div>
 
-        <section class="panel" aria-labelledby="hist-title">
-          <h2 id="hist-title"><mat-icon aria-hidden="true">history</mat-icon>Histórico de movimentações</h2>
-          @if (movements().length === 0) {
-            <p class="empty">Nenhuma movimentação registrada ainda.</p>
+        <section aria-labelledby="grid-title">
+          <h2 class="section-title" id="grid-title">{{ single() ? 'Estoque' : 'Tamanhos' }}</h2>
+          @if (single()) {
+            <p class="single">
+              <span class="tag static" [class.low]="levelOf(p.variants[0]) === 'low'" [class.out]="levelOf(p.variants[0]) === 'out'">
+                <span class="tag-size">Único</span>
+                <span class="tag-qty">{{ p.variants[0].quantity === 0 ? 'esgotado' : p.variants[0].quantity + ' un.' }}</span>
+              </span>
+            </p>
           } @else {
-            <div class="tbl-wrap">
-              <table class="tbl">
-                <caption class="sr-only">Movimentações de {{ p.name }}</caption>
-                <thead><tr><th scope="col">Data</th><th scope="col">Tipo</th><th scope="col" class="r">Qtd.</th><th scope="col" class="r">Saldo</th><th scope="col">Motivo</th><th scope="col" class="hide-sm">Por</th></tr></thead>
-                <tbody>
-                  @for (m of visibleMovements(); track m.id) {
-                    <tr>
-                      <td class="num">{{ m.occurredAt | date: 'dd/MM/yy HH:mm' }}</td>
-                      <td><span [class]="chipClass(m.type)">{{ label[m.type] }}</span></td>
-                      <td class="r num" [class.pos]="m.delta > 0" [class.neg]="m.delta < 0">{{ m.delta > 0 ? '+' : '' }}{{ m.delta | number }}</td>
-                      <td class="r num">{{ m.quantityAfter | number }}</td>
-                      <td>{{ m.reason ?? '—' }}</td>
-                      <td class="muted small hide-sm">{{ m.createdBy ?? '—' }}</td>
-                    </tr>
+            @for (g of groups(); track g.material) {
+              <div class="group">
+                @if (g.material) { <h3 class="group-title">{{ g.material }}</h3> }
+                <ul class="tag-row" role="list">
+                  @for (v of g.variants; track v.id) {
+                    <li class="tag static" [class.low]="levelOf(v) === 'low'" [class.out]="levelOf(v) === 'out'"
+                      [attr.aria-label]="'Tamanho ' + v.size + ': ' + (v.quantity === 0 ? 'esgotado' : v.quantity + ' peças')">
+                      <span class="tag-size">{{ v.size }}</span>
+                      <span class="tag-qty">{{ v.quantity === 0 ? 'esgotado' : v.quantity + ' un.' }}</span>
+                    </li>
                   }
-                </tbody>
-              </table>
-            </div>
-            @if (movements().length > shown()) {
-              <button type="button" class="btn btn-outline more" (click)="shown.set(shown() + 50)">
-                Mostrar mais ({{ movements().length - shown() }} restantes)
-              </button>
+                </ul>
+              </div>
             }
+            <p class="legend muted small">Laranja: no estoque mínimo. Riscado: esgotado.</p>
           }
         </section>
+
+        @if (forecast(); as f) {
+          @if (f.avgDailyOut > 0) {
+            <section class="panel forecast" aria-labelledby="fc-title">
+              <h2 id="fc-title"><mat-icon aria-hidden="true">schedule</mat-icon>Ritmo de venda</h2>
+              <p>
+                Vende em média <b>{{ f.avgDailyOut | number: '1.0-1' : 'pt-BR' }}</b> {{ f.avgDailyOut === 1 ? 'peça' : 'peças' }} por dia.
+                @if (f.daysToStockout !== null) {
+                  No ritmo atual, acaba em <b>{{ f.daysToStockout | number: '1.0-0' : 'pt-BR' }} dias</b>.
+                }
+              </p>
+              @if (f.needsReorder) {
+                <p class="reorder">Sugestão: comprar <b>{{ f.suggestedReorder }}</b> peças para os próximos 30 dias.</p>
+              }
+            </section>
+          }
+        }
+
+        @if (auth.canReport()) {
+          <section aria-labelledby="hist-title">
+            <h2 class="section-title" id="hist-title">Histórico</h2>
+            @if (movements().length === 0) {
+              <p class="empty">Nenhuma movimentação ainda.</p>
+            } @else {
+              <ul class="list">
+                @for (m of visibleMovements(); track m.id) {
+                  <li class="list-row hist">
+                    <div class="grow">
+                      <div class="title">
+                        <span [class]="chipClass(m.type)">{{ m.reason === 'Venda' ? 'Venda' : label[m.type] }}</span>
+                        @if (m.variantLabel && m.variantLabel !== 'Único') { <span class="hist-size">{{ variantText(m.variantLabel) }}</span> }
+                      </div>
+                      <div class="sub">{{ moveMeta(m) }}</div>
+                    </div>
+                    <span class="end delta num" [class.pos]="m.delta > 0" [class.neg]="m.delta < 0">{{ m.delta > 0 ? '+' : '' }}{{ m.delta }}</span>
+                  </li>
+                }
+              </ul>
+              @if (movements().length > shown()) {
+                <button type="button" class="btn btn-ghost more" (click)="shown.set(shown() + 30)">Mostrar mais</button>
+              }
+            }
+          </section>
+        }
+
+        <!-- chegou mercadoria: quanto chegou de cada tamanho -->
+        @if (entryOpen()) {
+          <div class="scrim" (click)="closeEntry()" aria-hidden="true"></div>
+          <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="entry-title" (keydown.escape)="closeEntry()">
+            <div class="sheet-head">
+              <div class="grow">
+                <h2 id="entry-title">Chegou mercadoria</h2>
+                <p class="muted entry-sub">{{ p.name }}. Diga quantas peças chegaram de cada tamanho.</p>
+              </div>
+              <button type="button" class="icon-btn" (click)="closeEntry()" aria-label="Fechar"><mat-icon aria-hidden="true">close</mat-icon></button>
+            </div>
+            <div class="sheet-body">
+              @for (g of groups(); track g.material) {
+                @if (g.material && groups().length > 1) { <h3 class="group-title">{{ g.material }}</h3> }
+                <ul class="entry-list">
+                  @for (v of g.variants; track v.id) {
+                    <li class="entry-row">
+                      <span class="entry-size">
+                        <b>{{ sizeText(v) }}</b>
+                        <span class="muted small">tem {{ v.quantity }}</span>
+                      </span>
+                      <div class="stepper">
+                        <button type="button" (click)="stepEntry(v, -1)" [disabled]="!entry()[v.id]" [attr.aria-label]="'Menos uma no ' + sizeText(v)"><mat-icon>remove</mat-icon></button>
+                        <input type="number" inputmode="numeric" min="0" max="10000" [value]="entry()[v.id] || 0"
+                          (input)="setEntry(v, $any($event.target).valueAsNumber)" (focus)="$any($event.target).select()"
+                          [attr.aria-label]="'Peças que chegaram no ' + sizeText(v)">
+                        <button type="button" (click)="stepEntry(v, 1)" [attr.aria-label]="'Mais uma no ' + sizeText(v)"><mat-icon>add</mat-icon></button>
+                      </div>
+                    </li>
+                  }
+                </ul>
+              }
+            </div>
+            <div class="sheet-foot">
+              <button type="button" class="btn btn-primary btn-lg btn-block" [disabled]="entryTotal() === 0 || saving()" (click)="saveEntry()" id="btn-save-entry">
+                <mat-icon aria-hidden="true">add</mat-icon>
+                <span>
+                  @if (saving()) { Somando… }
+                  @else if (entryTotal() === 0) { Informe quantas chegaram }
+                  @else { Somar {{ entryTotal() }} {{ entryTotal() === 1 ? 'peça' : 'peças' }} ao estoque }
+                </span>
+              </button>
+            </div>
+          </section>
+        }
       }
     }
   }

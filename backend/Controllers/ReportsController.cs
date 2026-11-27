@@ -1,9 +1,12 @@
+using backend.Security;
 using backend.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace backend.Controllers
 {
-    /// <summary>Relatorios de movimentacao e previsao de ruptura/reposicao (qualquer perfil logado).</summary>
+    /// <summary>Relatorios de movimentacao e previsao de ruptura/reposicao (Admin e Visualizador).</summary>
+    [Authorize(Policy = AuthSetup.ReportsPolicy)]
     [Route("api/reports")]
     public class ReportsController : ApiControllerBase
     {

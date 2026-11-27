@@ -2,8 +2,42 @@ using backend.Models;
 
 namespace backend.Data
 {
+    /// <summary>
+    /// Dados de demonstracao de uma loja de roupas: produtos com grade (tamanho x material), vendas do balcao com
+    /// forma de pagamento nos ultimos 45 dias e compras de reposicao. Deterministico (mesma semente) e coerente:
+    /// o saldo de cada variacao e exatamente a soma das suas movimentacoes.
+    /// </summary>
     public static class DbInitializer
     {
+        private record Seed(string Name, string Brand, string Category, string Description, decimal Price, decimal Cost,
+            string[] Sizes, string[] Materials, double Popularity, bool Restock = true);
+
+        private static readonly Seed[] Catalog =
+        {
+            new("Calça Jeans Slim Preta", "Calvin Klein", "Calças", "Modelagem slim, cintura média, lavagem escura.",
+                299.90m, 150m, new[] { "38", "40", "42", "44", "46" }, new[] { "Jeans", "Sarja" }, 1.0),
+            new("Calça Chino Bege", "Reserva", "Calças", "Corte reto em sarja com elastano, bolsos faca.",
+                229.90m, 110m, new[] { "38", "40", "42", "44" }, new[] { "Sarja" }, 0.7),
+            new("Camiseta Básica Branca", "Hering", "Camisetas", "Gola careca, malha 100% algodão.",
+                49.90m, 22m, new[] { "P", "M", "G", "GG" }, new[] { "Algodão" }, 2.2),
+            new("Camiseta Básica Preta", "Hering", "Camisetas", "Gola careca, malha 100% algodão.",
+                49.90m, 22m, new[] { "P", "M", "G", "GG" }, new[] { "Algodão" }, 2.0),
+            new("Camisa Polo Azul-Marinho", "Lacoste", "Camisetas", "Polo em malha piquet com bordado no peito.",
+                389.90m, 190m, new[] { "P", "M", "G", "GG" }, new[] { "Piquet" }, 0.5),
+            new("Camisa Social Branca", "Dudalina", "Camisas", "Manga longa, colarinho italiano.",
+                349.90m, 170m, new[] { "P", "M", "G", "GG" }, new[] { "Algodão", "Linho" }, 0.6),
+            new("Bermuda Jeans Clara", "Levi's", "Bermudas", "Lavagem clara, barra dobrada.",
+                199.90m, 95m, new[] { "38", "40", "42", "44" }, new[] { "Jeans" }, 0.8),
+            new("Jaqueta Jeans Trucker", "Levi's", "Jaquetas", "Clássica com botões de metal.",
+                459.90m, 230m, new[] { "P", "M", "G" }, new[] { "Jeans" }, 0.5, Restock: false),
+            new("Moletom Canguru Cinza", "Nike", "Moletons", "Capuz com cordão e bolso canguru.",
+                329.90m, 160m, new[] { "P", "M", "G", "GG" }, new[] { "Moletom" }, 0.6),
+            new("Vestido Midi Floral", "Farm", "Vestidos", "Estampa exclusiva, alças finas.",
+                279.90m, 130m, new[] { "PP", "P", "M", "G" }, new[] { "Viscose", "Linho" }, 0.7),
+            new("Meia Cano Alto", "Lupo", "Acessórios", "Pacote com 3 pares.",
+                39.90m, 18m, new[] { ProductVariant.DefaultSize }, new[] { "" }, 1.5),
+        };
+
         public static void Initialize(AppDbContext context)
         {
             if (context.Products.Any())
@@ -12,177 +46,119 @@ namespace backend.Data
             }
 
             var now = DateTime.UtcNow;
+            const int days = 45;
+            var start = now.AddDays(-days);
+            var rng = new Random(42);
 
-            var products = new List<Product>
+            var products = new List<Product>();
+            foreach (var s in Catalog)
             {
-                new()
+                var p = new Product
                 {
-                    Name = "Mouse Sem Fio Ergonômico",
-                    Description = "Mouse óptico sem fio ergonômico com receptor USB e ajuste de DPI",
-                    Category = "Eletrônicos",
-                    Quantity = 45,
-                    Price = 89.90m,
-                    Cost = 52.00m,
-                    MinStock = 10,
-                    CreatedAt = now,
-                    UpdatedAt = now
-                },
-                new()
-                {
-                    Name = "Teclado Mecânico RGB",
-                    Description = "Teclado mecânico gamer RGB com switches azuis e padrão ABNT2",
-                    Category = "Eletrônicos",
-                    Quantity = 20,
-                    Price = 249.90m,
-                    Cost = 155.00m,
-                    MinStock = 5,
-                    CreatedAt = now,
-                    UpdatedAt = now
-                },
-                new()
-                {
-                    Name = "Hub USB-C 7 em 1",
-                    Description = "Hub adaptador multifuncional USB-C com HDMI 4K, USB 3.0 e leitores SD",
-                    Category = "Acessórios",
-                    Quantity = 15,
-                    Price = 139.90m,
-                    Cost = 82.00m,
-                    MinStock = 5,
-                    CreatedAt = now,
-                    UpdatedAt = now
-                },
-                new()
-                {
-                    Name = "Suporte para Monitor Articulado",
-                    Description = "Suporte articulado de mesa com pistão a gás para telas de 17 a 32 polegadas",
-                    Category = "Móveis",
-                    Quantity = 8,
-                    Price = 179.90m,
-                    Cost = 105.00m,
-                    MinStock = 3,
-                    CreatedAt = now,
-                    UpdatedAt = now
-                },
-                new()
-                {
-                    Name = "Webcam Full HD 1080p",
-                    Description = "Câmera de alta resolução com microfone estéreo embutido para reuniões",
-                    Category = "Eletrônicos",
-                    Quantity = 12,
-                    Price = 159.90m,
-                    Cost = 96.00m,
-                    MinStock = 4,
-                    CreatedAt = now,
-                    UpdatedAt = now
-                },
-                new()
-                {
-                    Name = "Luminária de Mesa LED",
-                    Description = "Luminária touch com temperatura de cor ajustável e porta USB de recarga",
-                    Category = "Móveis",
-                    Quantity = 4,
-                    Price = 79.90m,
-                    Cost = 41.00m,
-                    MinStock = 5,
-                    CreatedAt = now,
-                    UpdatedAt = now
-                },
-                new()
-                {
-                    Name = "Caderno Executivo A5",
-                    Description = "Caderno pautado com capa dura texturizada, marcador de página e 160 folhas",
-                    Category = "Escritório",
-                    Quantity = 60,
-                    Price = 34.90m,
-                    Cost = 16.50m,
-                    MinStock = 15,
-                    CreatedAt = now,
-                    UpdatedAt = now
-                },
-                new()
-                {
-                    Name = "Cabo de Rede Cat6 3m",
-                    Description = "Cabo de rede gigabit com conectores blindados e proteção anti-ruído",
-                    Category = "Acessórios",
-                    Quantity = 0,
-                    Price = 19.90m,
-                    Cost = 8.40m,
-                    MinStock = 10,
-                    CreatedAt = now,
-                    UpdatedAt = now
-                }
-            };
-
+                    Name = s.Name, Brand = s.Brand, Category = s.Category, Description = s.Description,
+                    Price = s.Price, Cost = s.Cost, CreatedAt = start, UpdatedAt = start
+                };
+                var order = 0;
+                foreach (var material in s.Materials)
+                    foreach (var size in s.Sizes)
+                    {
+                        // tamanhos do meio vendem mais e tem minimo maior
+                        var middle = Math.Abs(Array.IndexOf(s.Sizes, size) - (s.Sizes.Length - 1) / 2.0) < 1;
+                        p.Variants.Add(new ProductVariant
+                        {
+                            Size = size, Material = material, SortOrder = order++,
+                            MinStock = s.Popularity >= 1.5 ? 4 : middle ? 2 : 1
+                        });
+                    }
+                products.Add(p);
+            }
             context.Products.AddRange(products);
             context.SaveChanges();
-            SeedHistory(context, products, now);
-        }
-    
 
-        /// <summary>
-        /// Historico de demonstracao (ultimos 45 dias): estoque inicial, vendas diarias e compras quinzenais,
-        /// para relatorios e previsao terem dados. Deterministico (mesma semente) e coerente: o saldo final de cada
-        /// produto e exatamente a soma das suas movimentacoes.
-        /// </summary>
-        private static void SeedHistory(AppDbContext context, List<Product> products, DateTime now)
-        {
-            var rng = new Random(42);
-            const int days = 45;
-            // vendas medias por dia de cada produto (mesma ordem da lista acima)
-            var rates = new[] { 2.2, 0.9, 0.7, 0.25, 0.6, 0.35, 1.8, 1.1 };
-            var reasons = new[] { "Venda", "Venda", "Venda", "Venda", "Perda", "Uso interno" };
-            // um dia por iteracao a partir de 45 dias atras; o ultimo evento fica no maximo ~8h depois de "ontem a esta hora"
-            var start = now.AddDays(-days);
-
-            for (var i = 0; i < products.Count; i++)
+            var moves = new List<StockMovement>();
+            void Move(Product p, ProductVariant v, string type, int delta, string reason, DateTime at, string by, Sale? sale = null)
             {
-                var p = products[i];
-                var rate = rates[i % rates.Length];
-                var events = new List<(DateTime At, int Delta, string Reason)>();
-                for (var d = 1; d < days; d++)
+                v.Quantity += delta;
+                moves.Add(new StockMovement
                 {
-                    var at = start.AddDays(d).AddMinutes(rng.Next(0, 480));
-                    var sold = (int)Math.Round(rate + (rng.NextDouble() - 0.5) * rate);
-                    if (sold > 0) events.Add((at, -sold, reasons[rng.Next(reasons.Length)]));
-                    // reposicao a cada 15 dias, menos para o produto que termina esgotado
-                    if (d % 15 == 0 && p.Quantity > 0) events.Add((at.AddHours(-3), (int)Math.Ceiling(rate * 15), "Compra de fornecedor"));
-                }
-                // nada no futuro (relogio de quem abre o sistema logo depois do seed)
-                events.RemoveAll(e => e.At > now.AddMinutes(-5));
-
-                // saldo inicial suficiente para nunca ficar negativo e terminar no saldo cadastrado
-                var running = 0; var lowest = 0;
-                foreach (var e in events) { running += e.Delta; lowest = Math.Min(lowest, running); }
-                var initial = p.Quantity - running;
-                if (initial + lowest < 0)
-                {
-                    // nao fecha: aumenta o estoque inicial e corrige o saldo final com uma conferencia
-                    initial = -lowest;
-                }
-
-                var moves = new List<StockMovement>();
-                var qty = initial;
-                if (initial > 0)
-                    moves.Add(new StockMovement { ProductId = p.Id, ProductName = p.Name, Type = MovementTypes.In, Delta = initial,
-                        QuantityAfter = qty, Reason = "Estoque inicial", OccurredAt = start, CreatedAt = start, CreatedBy = "seed" });
-                foreach (var e in events.OrderBy(e => e.At))
-                {
-                    qty += e.Delta;
-                    moves.Add(new StockMovement { ProductId = p.Id, ProductName = p.Name,
-                        Type = e.Delta > 0 ? MovementTypes.In : MovementTypes.Out, Delta = e.Delta, QuantityAfter = qty,
-                        Reason = e.Reason, OccurredAt = e.At, CreatedAt = e.At, CreatedBy = "seed" });
-                }
-                if (qty != p.Quantity)
-                {
-                    var at = now.AddHours(-1);
-                    moves.Add(new StockMovement { ProductId = p.Id, ProductName = p.Name, Type = MovementTypes.Adjust,
-                        Delta = p.Quantity - qty, QuantityAfter = p.Quantity, Reason = "Conferencia de estoque",
-                        OccurredAt = at, CreatedAt = at, CreatedBy = "seed" });
-                }
-                // historico existe ha 45 dias: a data de cadastro acompanha (a previsao usa os dias observados)
-                p.CreatedAt = start;
-                context.StockMovements.AddRange(moves);
+                    ProductId = p.Id, ProductName = p.Name, VariantId = v.Id, VariantLabel = v.Label, Type = type,
+                    Delta = delta, QuantityAfter = v.Quantity, Reason = reason, OccurredAt = at, CreatedAt = at,
+                    CreatedBy = by, Sale = sale, PaymentMethod = sale?.PaymentMethod
+                });
             }
+
+            // estoque inicial
+            for (var i = 0; i < products.Count; i++)
+                foreach (var v in products[i].Variants)
+                    Move(products[i], v, MovementTypes.In,
+                        (int)Math.Ceiling(Catalog[i].Popularity * 3) + v.MinStock + rng.Next(0, 4),
+                        "Estoque inicial", start, "seed");
+
+            // pesos de venda: produtos populares e tamanhos do meio saem mais
+            var pool = new List<(int P, ProductVariant V, double W)>();
+            for (var i = 0; i < products.Count; i++)
+                foreach (var v in products[i].Variants)
+                    pool.Add((i, v, Catalog[i].Popularity * (v.MinStock >= 2 ? 1.6 : 1.0) / Catalog[i].Materials.Length));
+            var total = pool.Sum(x => x.W);
+            (int P, ProductVariant V) Pick()
+            {
+                var r = rng.NextDouble() * total;
+                foreach (var x in pool) { r -= x.W; if (r <= 0) return (x.P, x.V); }
+                return (pool[^1].P, pool[^1].V);
+            }
+            var payments = new[] { PaymentMethods.Pix, PaymentMethods.Pix, PaymentMethods.Pix, PaymentMethods.Credit,
+                PaymentMethods.Credit, PaymentMethods.Debit, PaymentMethods.Debit, PaymentMethods.Cash };
+            var sellers = new[] { "seed", "seed" };
+
+            var sales = new List<Sale>();
+            for (var d = 1; d < days; d++)
+            {
+                var day = start.Date.AddDays(d);
+                // reposicao quinzenal: completa o que esta no minimo
+                if (d % 15 == 0)
+                    for (var i = 0; i < products.Count; i++)
+                        if (Catalog[i].Restock)
+                            foreach (var v in products[i].Variants.Where(v => v.Quantity <= v.MinStock + 1))
+                                Move(products[i], v, MovementTypes.In, v.MinStock * 3 + 3 - v.Quantity + 1,
+                                    "Compra de fornecedor", day.AddHours(12), "seed");
+
+                var count = rng.Next(2, 7) + (day.DayOfWeek is DayOfWeek.Saturday ? 3 : 0);
+                for (var k = 0; k < count; k++)
+                {
+                    // horario de loja: 9h as 19h em Brasilia (12h a 22h UTC)
+                    var at = day.AddHours(12).AddMinutes(rng.Next(0, 600));
+                    if (at > now.AddMinutes(-5)) continue;
+                    var items = new Dictionary<ProductVariant, (int P, int Q)>();
+                    var lines = rng.NextDouble() < 0.65 ? 1 : rng.Next(2, 4);
+                    for (var l = 0; l < lines; l++)
+                    {
+                        var (pi, v) = Pick();
+                        var already = items.TryGetValue(v, out var e) ? e.Q : 0;
+                        var q = rng.NextDouble() < 0.8 ? 1 : 2;
+                        if (v.Quantity - already >= q) items[v] = (pi, already + q);
+                    }
+                    if (items.Count == 0) continue;
+                    var sale = new Sale { PaymentMethod = payments[rng.Next(payments.Length)], CreatedAt = at, CreatedBy = sellers[k % sellers.Length] };
+                    sales.Add(sale);
+                    foreach (var (v, (pi, q)) in items)
+                        Move(products[pi], v, MovementTypes.Out, -q, "Venda", at, sale.CreatedBy!, sale);
+                }
+            }
+
+            // produto sem reposicao termina esgotado (aparece na reposicao sugerida)
+            var conf = now.AddHours(-1);
+            for (var i = 0; i < products.Count; i++)
+                if (!Catalog[i].Restock)
+                    foreach (var v in products[i].Variants.Where(v => v.Quantity > 0))
+                        Move(products[i], v, MovementTypes.Adjust, -v.Quantity, "Conferencia de estoque", conf, "seed");
+
+            foreach (var p in products)
+            {
+                p.RecomputeTotals();
+                p.UpdatedAt = now;
+            }
+            context.Sales.AddRange(sales);
+            context.StockMovements.AddRange(moves);
             context.SaveChanges();
         }
     }
