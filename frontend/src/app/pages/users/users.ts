@@ -11,6 +11,7 @@ import { ConfirmDialogComponent } from '../../components/confirm-dialog/confirm-
 import { CodeDialogComponent } from '../../components/code-dialog/code-dialog';
 import { CreateUserDialogComponent } from '../../components/user-dialogs/create-user-dialog';
 import { EditProfileDialogComponent } from '../../components/user-dialogs/edit-profile-dialog';
+import { PERFIL_NOME } from '../../components/user-dialogs/perfis';
 
 @Component({
   selector: 'app-users',
@@ -27,6 +28,7 @@ export class UsersComponent implements OnInit {
 
   readonly state = signal<'loading' | 'error' | 'ready'>('loading');
   readonly list = signal<ManagedUser[]>([]);
+  readonly perfilNome = PERFIL_NOME;
   readonly announcement = signal('');
 
   ngOnInit(): void {

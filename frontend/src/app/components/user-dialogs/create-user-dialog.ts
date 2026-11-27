@@ -42,7 +42,7 @@ export class CreateUserDialogComponent {
 
   readonly perfis = PERFIS;
   readonly email = signal('');
-  readonly perfil = signal<Perfil>('Visualizador');
+  readonly perfil = signal<Perfil>('Operador');
   readonly loading = signal(false);
   readonly error = signal('');
 

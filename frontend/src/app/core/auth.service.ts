@@ -29,8 +29,17 @@ export class AuthService {
   readonly isAdmin = computed(() => this.user()?.perfil === 'Admin');
   /** Escrita em produtos: só Admin (o backend é a autoridade; aqui só escondemos os botões). */
   readonly canWrite = this.isAdmin;
-  /** Registrar entradas/saídas/ajustes de estoque: Admin ou Operador. */
-  readonly canMove = computed(() => this.user()?.perfil === 'Admin' || this.user()?.perfil === 'Operador');
+  /** Entradas, ajustes e cadastro: só Admin (o funcionário só vende). */
+  readonly canMove = this.isAdmin;
+  readonly isOperator = computed(() => this.user()?.perfil === 'Operador');
+  /** Registrar vendas no balcão: Admin ou Operador. */
+  readonly canSell = computed(() => this.user()?.perfil === 'Admin' || this.user()?.perfil === 'Operador');
+  /** Relatórios e histórico: Admin ou Visualizador. */
+  readonly canReport = computed(() => this.user()?.perfil === 'Admin' || this.user()?.perfil === 'Visualizador');
+  /** Primeira tela depois de entrar: o funcionário vai direto para a venda. */
+  homePath(): string {
+    return this.isOperator() ? '/vender' : '/';
+  }
 
   private loading?: Promise<void>;
 

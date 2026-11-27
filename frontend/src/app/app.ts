@@ -1,12 +1,13 @@
 import { Component, ElementRef, computed, inject, viewChild } from '@angular/core';
-import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { filter, map } from 'rxjs';
+import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDialog } from '@angular/material/dialog';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { SettingsDialogComponent } from './components/settings-dialog/settings-dialog';
 import { AuthService } from './core/auth.service';
+
+interface NavLink { path: string; label: string; icon: string; id: string; exact: boolean; }
+
+const ROLE_NAME: Record<string, string> = { Admin: 'Dono', Operador: 'Vendedor', Visualizador: 'Consulta' };
 
 @Component({
   selector: 'app-root',
@@ -16,52 +17,33 @@ import { AuthService } from './core/auth.service';
   styleUrl: './app.scss'
 })
 export class AppComponent {
-  private router = inject(Router);
   private dialog = inject(MatDialog);
   readonly auth = inject(AuthService);
-  private snack = inject(MatSnackBar);
+  private main = viewChild<ElementRef<HTMLElement>>('main');
 
   constructor() {
     this.auth.ensureLoaded(); // descobre a sessão no boot (GET /api/auth/me)
   }
 
   readonly initials = computed(() => (this.auth.user()?.email ?? '').slice(0, 2).toUpperCase());
+  /** "admin@loja.com" vira "Admin": nome curto para o topo. */
+  readonly firstName = computed(() => {
+    const local = (this.auth.user()?.email ?? '').split('@')[0].split(/[._-]/)[0];
+    return local ? local[0].toUpperCase() + local.slice(1) : '';
+  });
+  readonly roleName = computed(() => ROLE_NAME[this.auth.user()?.perfil ?? ''] ?? '');
 
-  /** Encerra a sessão em TODOS os dispositivos. Se falhar, a tela NÃO finge que saiu. */
-  logout(): void {
-    this.auth.logout().subscribe({
-      next: () => this.router.navigate(['/login']),
-      error: () => this.snack.open('Não foi possível encerrar a sessão. Tente novamente.', 'Fechar', { duration: 5000 })
-    });
-  }
-  private main = viewChild<ElementRef<HTMLElement>>('main');
-
-  private url = toSignal(
-    this.router.events.pipe(filter((e) => e instanceof NavigationEnd), map(() => this.router.url)),
-    { initialValue: this.router.url }
-  );
-
-  readonly query = toSignal(
-    this.router.events.pipe(filter((e) => e instanceof NavigationEnd), map(() => this.currentQuery())),
-    { initialValue: this.currentQuery() }
-  );
-
-  /** ?q= como texto único (se vier repetido, usa o primeiro). */
-  private currentQuery(): string {
-    const q = this.router.parseUrl(this.router.url).queryParams['q'];
-    return String(Array.isArray(q) ? q[0] : q ?? '');
-  }
-
-  onSearch(event: Event, value: string): void {
-    event.preventDefault();
-    const q = value.trim();
-    this.router.navigate(['/products'], { queryParams: { q: q || null } });
-  }
-
-  /** "Produtos" fica ativo na lista e na edição, mas não em /products/new (que tem item próprio). */
-  readonly productsActive = computed(() => {
-    const path = this.url().split(/[?#]/)[0];
-    return path.startsWith('/products') && path !== '/products/new';
+  /** Menu por perfil: o vendedor só vê o que usa no balcão. */
+  readonly links = computed<NavLink[]>(() => {
+    const a = this.auth;
+    const all: (NavLink & { show: boolean })[] = [
+      { path: '/', label: 'Início', icon: 'home', id: 'home', exact: true, show: !a.isOperator() },
+      { path: '/vender', label: 'Vender', icon: 'shopping_bag', id: 'sell', exact: false, show: a.canSell() },
+      { path: '/products', label: 'Produtos', icon: 'checkroom', id: 'products', exact: false, show: true },
+      { path: '/reports', label: 'Relatórios', icon: 'insights', id: 'reports', exact: false, show: a.canReport() },
+      { path: '/users', label: 'Equipe', icon: 'group', id: 'users', exact: false, show: a.isAdmin() }
+    ];
+    return all.filter((l) => l.show);
   });
 
   openSettings(): void {

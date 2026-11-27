@@ -46,6 +46,6 @@ export class ThemeService {
 
   private apply(mode: ThemeMode): void {
     document.documentElement.setAttribute('data-theme', mode);
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', mode === 'dark' ? '#0b1220' : '#f6f7f9');
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', mode === 'dark' ? '#0d1526' : '#eef2f8');
   }
 }

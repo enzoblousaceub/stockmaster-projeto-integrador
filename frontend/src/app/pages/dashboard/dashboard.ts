@@ -1,70 +1,52 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { CurrencyPipe, DecimalPipe } from '@angular/common';
+import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { forkJoin } from 'rxjs';
+import { forkJoin, of, catchError } from 'rxjs';
 import { MatIconModule } from '@angular/material/icon';
+import { GarmentComponent } from '../../components/garment/garment';
 import { ProductService } from '../../services/product.service';
 import { AuthService } from '../../core/auth.service';
-import { DashboardStats, MovementResult, Product } from '../../models/product.model';
-import { MatDialog } from '@angular/material/dialog';
-import { MatSnackBar } from '@angular/material/snack-bar';
-import { MovementDialogComponent, MovementDialogData } from '../../components/movement-dialog/movement-dialog';
+import { DashboardStats, PAYMENT_LABEL, Sale, StockAlert, monogram, productImageUrl, variantText } from '../../models/product.model';
 
-interface CategoryBar {
-  name: string;
-  items: number;
-  value: number;
-  products: number;
-  percent: number;
-}
-
+/** Início do dono: o que fazer agora (atalhos), como foi o dia, o que precisa repor e quanto vale o estoque. */
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [RouterLink, MatIconModule, CurrencyPipe, DecimalPipe],
+  imports: [RouterLink, MatIconModule, CurrencyPipe, DecimalPipe, DatePipe, GarmentComponent],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss'
 })
 export class DashboardComponent {
-  private productService = inject(ProductService);
-  private dialog = inject(MatDialog);
-  private snack = inject(MatSnackBar);
-  private auth = inject(AuthService);
-  readonly canWrite = this.auth.canWrite;
-  readonly canMove = this.auth.canMove;
+  private api = inject(ProductService);
+  readonly auth = inject(AuthService);
+  readonly paymentLabel = PAYMENT_LABEL;
+  readonly variantText = variantText;
+  readonly monogram = monogram;
 
   readonly state = signal<'loading' | 'error' | 'ready'>('loading');
   readonly stats = signal<DashboardStats | null>(null);
-  readonly products = signal<Product[]>([]);
+  readonly alerts = signal<StockAlert[]>([]);
+  readonly sales = signal<Sale[]>([]);
+  readonly showAllAlerts = signal(false);
 
-  /** Itens em ou abaixo do mínimo, os mais críticos primeiro (esgotados, depois menor razão qtd/mín). */
-  readonly alerts = computed(() =>
-    this.products()
-      .filter((p) => p.quantity <= p.minStock)
-      .sort((a, b) => this.severity(a) - this.severity(b) || a.name.localeCompare(b.name))
-  );
-  readonly liveMessage = computed(() =>
-    this.state() === 'loading' ? 'Carregando indicadores…' : this.state() === 'ready' ? 'Indicadores carregados' : ''
-  );
-  readonly topAlerts = computed(() => this.alerts().slice(0, 6));
-  readonly alertCount = computed(() => {
-    const s = this.stats();
-    return s ? s.lowStockCount + s.outOfStockCount : 0;
+  readonly name = computed(() => {
+    const local = (this.auth.user()?.email ?? '').split('@')[0].split(/[._-]/)[0];
+    return local ? local[0].toUpperCase() + local.slice(1) : '';
   });
+  readonly greeting = (() => {
+    const h = new Date().getHours();
+    return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
+  })();
+  readonly today = new Date();
 
-  readonly categories = computed<CategoryBar[]>(() => {
-    const map = new Map<string, CategoryBar>();
-    for (const p of this.products()) {
-      const c = map.get(p.category) ?? { name: p.category, items: 0, value: 0, products: 0, percent: 0 };
-      c.items += p.quantity;
-      c.value += p.quantity * p.price;
-      c.products += 1;
-      map.set(p.category, c);
-    }
-    const list = [...map.values()].sort((a, b) => b.items - a.items);
-    const max = Math.max(1, ...list.map((c) => c.items));
-    return list.map((c) => ({ ...c, percent: Math.round((c.items / max) * 100) }));
+  /** vendas de hoje (dia local), sem as desfeitas */
+  readonly todaySales = computed(() => {
+    const d = new Date().toDateString();
+    return this.sales().filter((s) => !s.undoneAt && new Date(s.createdAt).toDateString() === d);
   });
+  readonly todayPieces = computed(() => this.todaySales().reduce((n, s) => n + s.totalItems, 0));
+  readonly outCount = computed(() => this.alerts().filter((a) => a.quantity === 0).length);
+  readonly visibleAlerts = computed(() => (this.showAllAlerts() ? this.alerts() : this.alerts().slice(0, 6)));
 
   constructor() {
     this.load();
@@ -72,37 +54,28 @@ export class DashboardComponent {
 
   load(): void {
     this.state.set('loading');
-    forkJoin({ stats: this.productService.getStats(), products: this.productService.getProducts() }).subscribe({
-      next: ({ stats, products }) => {
+    forkJoin({
+      stats: this.api.getStats(),
+      alerts: this.api.getAlerts(),
+      // o Visualizador não registra vendas: a lista simplesmente não aparece
+      sales: this.auth.canSell() ? this.api.getSales(100).pipe(catchError(() => of([] as Sale[]))) : of([] as Sale[])
+    }).subscribe({
+      next: ({ stats, alerts, sales }) => {
         this.stats.set(stats);
-        this.products.set(products);
+        this.alerts.set(alerts);
+        this.sales.set(sales);
         this.state.set('ready');
       },
       error: () => this.state.set('error')
     });
   }
 
-  /** "Repor": registra a entrada da mercadoria que chegou e recarrega os indicadores. */
-  restock(p: Product, trigger: HTMLElement): void {
-    const ref = this.dialog.open<MovementDialogComponent, MovementDialogData, MovementResult>(MovementDialogComponent, {
-      width: '460px',
-      maxWidth: 'calc(100vw - 32px)',
-      ariaLabelledBy: 'movement-title',
-      data: { product: p, type: 'Entrada' },
-      restoreFocus: false
-    });
-    ref.afterClosed().subscribe((result) => {
-      if (!result) { trigger.focus(); return; }
-      this.snack.open(`Entrada registrada: ${p.name} agora tem ${result.product.quantity.toLocaleString('pt-BR')}`, 'Fechar', { duration: 3500 });
-      this.load();
-    });
+  saleSub(s: Sale): string {
+    const by = s.createdBy && s.createdBy !== 'seed' && s.createdBy !== this.auth.user()?.email ? `, por ${s.createdBy}` : '';
+    return this.paymentLabel[s.paymentMethod] + by;
   }
 
-  isOut(p: Product): boolean {
-    return p.quantity === 0;
-  }
-
-  private severity(p: Product): number {
-    return p.quantity === 0 ? -1 : p.quantity / Math.max(p.minStock, 1);
+  image(a: StockAlert): string | null {
+    return productImageUrl({ id: a.productId, imageUpdatedAt: a.imageUpdatedAt });
   }
 }

@@ -6,7 +6,7 @@ import { ProductService } from './product.service';
 import { Product } from '../models/product.model';
 
 const product: Product = {
-  id: 5, name: 'Mouse', category: 'Eletrônicos', quantity: 7, price: 10, cost: 6, minStock: 2,
+  id: 5, name: 'Camiseta', category: 'Camisetas', quantity: 7, price: 10, cost: 6, minStock: 2, variants: [],
   createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z'
 };
 
