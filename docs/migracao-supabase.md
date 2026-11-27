@@ -38,27 +38,9 @@ postgresql://postgres.<ref-do-projeto>:<SENHA>@aws-0-<regiao>.pooler.supabase.co
 2. Aguarde o restart e confira em **Logs** que não há erro de conexão; abra `https://<site>/healthz` → `{"status":"ok"}`.
 3. As migrations criam as tabelas no Supabase ao subir (banco ainda vazio, só com o Admin do bootstrap).
 
-## 4. Copiar os dados do Render
-O banco do Render é PostgreSQL 18 (o `pg_dump` 17 não lê), então a cópia é feita por um script Node
-(`scripts/copiar-dados`) com `COPY` tabela a tabela. Não precisa de Docker nem de cliente Postgres.
-O script confere se o `__EFMigrationsHistory` é igual nos dois bancos e aborta se não for.
-
-No Render: banco `stockmaster-db` → **Connect → External Database URL**.
-
-```bash
-cd scripts/copiar-dados
-npm install
-read -rs ORIGEM_URL;  export ORIGEM_URL     # cole a External URL do Render
-read -rs DESTINO_URL; export DESTINO_URL    # cole a URL do Session pooler do Supabase
-node copiar.mjs               # simulação: mostra as contagens dos dois lados, não altera nada
-node copiar.mjs --confirmar   # apaga os dados do Supabase e copia os do Render (transação única)
-```
-
-- O que já estava no Supabase (ex.: o Admin criado no primeiro start) é **substituído** pelos dados do Render.
-- Se as contagens não baterem, a transação é desfeita e nada fica gravado.
-- Depois, reinicie o serviço (Render → **Manual Deploy → Restart service**) para o app recarregar as chaves de sessão,
-  que vêm junto na cópia (Data Protection). Sessões antigas voltam a valer; quem entrou só no Supabase loga de novo.
-- Confira produtos e usuários no sistema. Só depois de alguns dias funcionando, apague o banco `stockmaster-db` no Render.
+## 4. Dados antigos
+Decisão de 26/11/2026: os dados do Postgres do Render **não foram copiados**; o Supabase começou do zero
+(migrations + Admin do bootstrap). O banco `stockmaster-db` do Render pode ser apagado; ele expiraria em ~09/12 de qualquer forma.
 
 ## 5. Deploy automático (CI/CD)
 O workflow `.github/workflows/ci.yml` roda build e testes em todo push/PR. Na **main**, se tudo passar,
